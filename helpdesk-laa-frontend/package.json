@@ -1,0 +1,36 @@
+{
+  "name": "helpdesk-laa-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "cross-env NODE_OPTIONS='--max-old-space-size=4096' next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "animejs": "^3.2.2",
+    "bcryptjs": "^3.0.3",
+    "next": "^16.2.3",
+    "nodemailer": "^8.0.7",
+    "pg": "^8.20.0",
+    "postcss": "^8.5.10",
+    "react": "19.2.4",
+    "react-dom": "19.2.4"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.2.2",
+    "@types/animejs": "^3.1.13",
+    "@types/bcryptjs": "^2.4.6",
+    "@types/node": "^20",
+    "@types/nodemailer": "^8.0.0",
+    "@types/pg": "^8.20.0",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "cross-env": "^10.1.0",
+    "eslint": "^9",
+    "eslint-config-next": "16.2.1",
+    "tailwindcss": "^4.2.2",
+    "typescript": "^5"
+  }
+}

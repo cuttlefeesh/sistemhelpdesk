@@ -1,0 +1,6 @@
+.claude/
+#backend_chatbot/model.safetensors
+backend_chatbot/model/
+**/__pycache__/
+*.pyc
+.env

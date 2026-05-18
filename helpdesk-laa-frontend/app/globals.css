@@ -1,0 +1,6 @@
+@import "tailwindcss";
+
+body {
+  background-color: #f9fafb; /* Latar belakang abu-abu sangat terang */
+  color: #171717; /* Warna teks utama gelap */
+}

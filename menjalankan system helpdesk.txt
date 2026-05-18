@@ -1,0 +1,14 @@
+menjalankan system helpdesk
+
+Terminal 1 (FastAPI)
+cd backend_chatbot
+.\venv\Scripts\activate
+uvicorn api_chatbot:app --reload --port 8000
+
+
+Terminal 2 (Frontend)
+masuk ke direktori filenya (.../helpdesk-laa-frontend)
+npm run dev
+
+PENTING
+selalu buka pgadmin4 dan aplikasi ollama selama aplikasi berjalan
