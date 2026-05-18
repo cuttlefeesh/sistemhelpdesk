@@ -1,12 +1,17 @@
 import { NextResponse } from "next/server";
 import pool from "@/lib/db";
+import { getSession } from "@/lib/auth";
 
 export async function GET() {
+  const session = await getSession();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   try {
     const result = await pool.query(
       `SELECT
          t.id, t.nim, t.nama, t.subject, t.description, t.status, t.date,
-         t.created_at, t.updated_at, t.handled_by,
+         t.created_at, t.updated_at, t.handled_by, t.layanan_id,
+         lm.nama_layanan,
          COALESCE((
            SELECT COUNT(*)::int
            FROM ticket_messages
@@ -25,16 +30,19 @@ export async function GET() {
            END
          AS unread_count
        FROM tickets t
+       LEFT JOIN layanan_master lm ON lm.id = t.layanan_id
        ORDER BY COALESCE(t.updated_at, t.created_at) DESC`
     );
     return NextResponse.json(result.rows);
   } catch {
     try {
       const result = await pool.query(
-        `SELECT id, nim, nama, subject, description, status, date, created_at,
-                CASE WHEN LOWER(status) = 'open' THEN 1 ELSE 0 END AS unread_count
-         FROM tickets
-         ORDER BY created_at DESC`
+        `SELECT t.id, t.nim, t.nama, t.subject, t.description, t.status, t.date,
+                t.created_at, t.layanan_id, lm.nama_layanan,
+                CASE WHEN LOWER(t.status) = 'open' THEN 1 ELSE 0 END AS unread_count
+         FROM tickets t
+         LEFT JOIN layanan_master lm ON lm.id = t.layanan_id
+         ORDER BY t.created_at DESC`
       );
       return NextResponse.json(result.rows);
     } catch (err) {

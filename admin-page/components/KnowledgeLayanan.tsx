@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import KnowledgeModal, { KnowledgeEntry, KnowledgeFormData } from "@/components/KnowledgeModal";
-import { tipeColor } from "@/lib/badgeColors";
+import { tipeColor, tipoLayananColor } from "@/lib/badgeColors";
 import { getCache, setCache, invalidateCache } from "@/lib/dataCache";
 import Pagination from "@/components/Pagination";
 
@@ -13,7 +13,8 @@ export default function KnowledgeLayanan() {
   const [entries, setEntries] = useState<KnowledgeEntry[]>(() => getCache<KnowledgeEntry>(CACHE_KEY_KNOWLEDGE) ?? []);
   const [loading, setLoading] = useState(() => !getCache<KnowledgeEntry>(CACHE_KEY_KNOWLEDGE));
   const [search, setSearch] = useState("");
-  const [filterTipe, setFilterTipe] = useState("");
+  const [filterTipePengguna, setFilterTipePengguna] = useState("");
+  const [filterTipeLayanan, setFilterTipeLayanan] = useState("");
   const [filterOpen, setFilterOpen] = useState(false);
   const [page, setPage] = useState(1);
   const [modalOpen, setModalOpen] = useState(false);
@@ -72,21 +73,29 @@ export default function KnowledgeLayanan() {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  const tipeOptions = [...new Set(entries.map((e) => e.tipe_pengguna).filter(Boolean))];
-
   const filtered = entries.filter((e) => {
+    const q = search.toLowerCase();
     const matchSearch =
-      e.intent.toLowerCase().includes(search.toLowerCase()) ||
-      (e.tipe_pengguna ?? "").toLowerCase().includes(search.toLowerCase());
-    const matchTipe = filterTipe ? e.tipe_pengguna === filterTipe : true;
-    return matchSearch && matchTipe;
+      e.intent.toLowerCase().includes(q) ||
+      (e.tipe_pengguna ?? "").toLowerCase().includes(q) ||
+      (e.deskripsi ?? "").toLowerCase().includes(q) ||
+      (e.unit_pengelola ?? "").toLowerCase().includes(q);
+    const matchTipePengguna = filterTipePengguna ? e.tipe_pengguna === filterTipePengguna : true;
+    const matchTipeLayanan  = filterTipeLayanan  ? (e.tipe_layanan ?? "LAA") === filterTipeLayanan : true;
+    return matchSearch && matchTipePengguna && matchTipeLayanan;
   });
 
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
-  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const paginated  = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-  const handleSearch = (v: string) => { setSearch(v); setPage(1); };
-  const handleFilterTipe = (v: string) => { setFilterTipe(v); setFilterOpen(false); setPage(1); };
+  const activeFilterCount = [filterTipePengguna, filterTipeLayanan].filter(Boolean).length;
+
+  const resetAllFilters = () => {
+    setSearch("");
+    setFilterTipePengguna("");
+    setFilterTipeLayanan("");
+    setPage(1);
+  };
 
   const handleSave = async (data: KnowledgeFormData) => {
     try {
@@ -170,43 +179,71 @@ export default function KnowledgeLayanan() {
           </h2>
 
           <div className="flex items-center gap-2">
-            {/* Filter dropdown */}
-            <div className="relative" ref={filterRef}>
+            {/* Multi-filter dropdown */}
+            <div className="relative shrink-0" ref={filterRef}>
               <button
                 onClick={() => setFilterOpen((p) => !p)}
-                className={`flex items-center gap-2 border rounded-lg px-3 py-1.5 text-sm font-medium transition ${
-                  filterTipe
-                    ? "border-red-500 text-red-600 bg-red-50"
+                className={`flex items-center gap-1.5 border rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+                  filterOpen
+                    ? "border-red-400 bg-red-50 text-red-600"
+                    : activeFilterCount > 0
+                    ? "border-red-400 text-red-600"
                     : "border-gray-200 text-gray-600 hover:bg-gray-50"
                 }`}
               >
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z" />
                 </svg>
                 Filter
-                {filterTipe && <span className="bg-red-500 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">1</span>}
+                {activeFilterCount > 0 && (
+                  <span className="bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px] font-bold leading-none">
+                    {activeFilterCount}
+                  </span>
+                )}
+                <svg xmlns="http://www.w3.org/2000/svg" className={`w-3 h-3 transition-transform ${filterOpen ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
               </button>
 
               {filterOpen && (
-                <div className="absolute left-0 top-full mt-1 z-20 bg-white border border-gray-200 rounded-xl shadow-lg w-52 p-3">
-                  <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Tipe Pengguna</p>
-                  <div className="flex flex-col gap-1">
-                    <button
-                      onClick={() => handleFilterTipe("")}
-                      className={`text-left px-3 py-1.5 rounded-lg text-sm transition ${!filterTipe ? "bg-red-50 text-red-600 font-medium" : "text-gray-600 hover:bg-gray-50"}`}
+                <div className="absolute right-0 top-full mt-1.5 z-30 bg-white border border-gray-200 rounded-xl shadow-lg w-72 p-4 flex flex-col gap-4">
+                  {/* Tipe Pengguna */}
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Tipe Pengguna</label>
+                    <select
+                      value={filterTipePengguna}
+                      onChange={(e) => { setFilterTipePengguna(e.target.value); setPage(1); }}
+                      className="border border-gray-200 rounded-lg px-3 py-1.5 text-xs text-gray-600 outline-none focus:ring-2 focus:ring-red-300 transition bg-white"
                     >
-                      Semua
-                    </button>
-                    {tipeOptions.map((t) => (
-                      <button
-                        key={t}
-                        onClick={() => handleFilterTipe(t)}
-                        className={`text-left px-3 py-1.5 rounded-lg text-sm transition ${filterTipe === t ? "bg-red-50 text-red-600 font-medium" : "text-gray-600 hover:bg-gray-50"}`}
-                      >
-                        {t}
-                      </button>
-                    ))}
+                      <option value="">Semua Pengguna</option>
+                      <option value="Mahasiswa">Mahasiswa</option>
+                      <option value="Dosen">Dosen</option>
+                    </select>
                   </div>
+
+                  {/* Tipe Layanan */}
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Tipe Layanan</label>
+                    <select
+                      value={filterTipeLayanan}
+                      onChange={(e) => { setFilterTipeLayanan(e.target.value); setPage(1); }}
+                      className="border border-gray-200 rounded-lg px-3 py-1.5 text-xs text-gray-600 outline-none focus:ring-2 focus:ring-red-300 transition bg-white"
+                    >
+                      <option value="">Semua Tipe</option>
+                      <option value="LAA">LAA</option>
+                      <option value="Referral">Referral</option>
+                    </select>
+                  </div>
+
+                  {/* Reset */}
+                  {activeFilterCount > 0 && (
+                    <button
+                      onClick={() => { resetAllFilters(); setFilterOpen(false); }}
+                      className="w-full text-xs text-red-600 border border-red-200 bg-red-50 hover:bg-red-100 rounded-lg py-1.5 font-medium transition"
+                    >
+                      Reset semua filter ({activeFilterCount})
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -215,8 +252,8 @@ export default function KnowledgeLayanan() {
             <input
               type="text"
               value={search}
-              onChange={(e) => handleSearch(e.target.value)}
-              placeholder="Cari intent atau tipe pengguna..."
+              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+              placeholder="Cari intent atau deskripsi..."
               className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm text-gray-600 placeholder-gray-400 outline-none focus:ring-2 focus:ring-red-300 transition w-64"
             />
 
@@ -240,6 +277,7 @@ export default function KnowledgeLayanan() {
                 <th className="th-cell w-10">No</th>
                 <th className="th-cell">Intent</th>
                 <th className="th-cell">Tipe Pengguna</th>
+                <th className="th-cell">Tipe Layanan</th>
                 <th className="th-cell">Deskripsi</th>
                 <th className="th-cell">Platform</th>
                 <th className="th-cell">Diperbarui</th>
@@ -253,6 +291,7 @@ export default function KnowledgeLayanan() {
                     <td className="px-6 py-4"><div className="h-4 bg-gray-100 rounded w-6" /></td>
                     <td className="px-6 py-4"><div className="h-4 bg-gray-100 rounded w-48" /></td>
                     <td className="px-6 py-4"><div className="h-6 bg-gray-100 rounded-full w-20" /></td>
+                    <td className="px-6 py-4"><div className="h-6 bg-gray-100 rounded-full w-16" /></td>
                     <td className="px-6 py-4">
                       <div className="h-3 bg-gray-100 rounded w-56 mb-1.5" />
                       <div className="h-3 bg-gray-100 rounded w-40" />
@@ -268,8 +307,8 @@ export default function KnowledgeLayanan() {
                   </tr>
                 ))
               ) : filtered.length === 0 ? (
-                <tr><td colSpan={7} className="px-6 py-12 text-center text-gray-400">
-                  {search || filterTipe ? "Tidak ada hasil yang cocok" : "Belum ada data knowledge"}
+                <tr><td colSpan={8} className="px-6 py-12 text-center text-gray-400">
+                  {search || activeFilterCount > 0 ? "Tidak ada hasil yang cocok" : "Belum ada data knowledge"}
                 </td></tr>
               ) : (
                 paginated.map((entry, idx) => (
@@ -280,6 +319,11 @@ export default function KnowledgeLayanan() {
                       {entry.tipe_pengguna
                         ? <span className={`${tipeColor(entry.tipe_pengguna)} text-xs font-medium px-2.5 py-1 rounded-full`}>{entry.tipe_pengguna}</span>
                         : <span className="text-gray-400">—</span>}
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={`${tipoLayananColor(entry.tipe_layanan ?? null)} text-xs font-medium px-2.5 py-1 rounded-full`}>
+                        {entry.tipe_layanan ?? "LAA"}
+                      </span>
                     </td>
                     <td className="px-6 py-4 text-gray-600 max-w-xs">
                       <p className="line-clamp-2">{entry.deskripsi || "—"}</p>

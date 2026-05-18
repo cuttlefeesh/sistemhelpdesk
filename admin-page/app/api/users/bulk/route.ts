@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import pool from "@/lib/db";
 import bcrypt from "bcryptjs";
 import { generateEmbedding, dosenFields } from "@/lib/embedding";
+import { getSession } from "@/lib/auth";
 
 /** Normalisasi prodi dari format DATA DOSEN: "PROGRAM STUDI S1 TEKNIK FISIKA (FTE)" → "S1 Teknik Fisika" */
 function normalizeProdi(raw: string): string {
@@ -29,6 +30,9 @@ function detectProdiFromKelas(kelas: string): string {
 }
 
 export async function POST(request: Request) {
+  const session = await getSession();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   try {
     const { role, rows } = await request.json() as {
       role: string;

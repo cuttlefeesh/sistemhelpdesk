@@ -3,4 +3,4 @@
 backend_chatbot/model/
 **/__pycache__/
 *.pyc
-.env
+.env*

@@ -5,6 +5,13 @@ import bcrypt from "bcryptjs";
 export async function POST(request: Request) {
   const { token, newPassword } = await request.json();
 
+  if (!newPassword || typeof newPassword !== "string" || newPassword.length < 6) {
+    return NextResponse.json(
+      { status: "error", message: "Password baru minimal 6 karakter" },
+      { status: 400 },
+    );
+  }
+
   try {
     // 1. Cek apakah tokennya ada dan belum kadaluwarsa
     const tokenCheck = await pool.query(

@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import pool from "@/lib/db";
+import { getSession } from "@/lib/auth";
 
 export async function PUT(request: Request, { params }: { params: Promise<{ nip: string }> }) {
+  const session = await getSession();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   try {
     const { nip } = await params;
     const body = await request.json();
@@ -30,6 +34,9 @@ export async function PUT(request: Request, { params }: { params: Promise<{ nip:
 }
 
 export async function DELETE(_: Request, { params }: { params: Promise<{ nip: string }> }) {
+  const session = await getSession();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   try {
     const { nip } = await params;
     const result = await pool.query("DELETE FROM dosen WHERE nip=$1", [nip]);

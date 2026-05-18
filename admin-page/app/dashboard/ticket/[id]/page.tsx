@@ -277,7 +277,7 @@ export default function TicketDetailPage() {
 
   if (loadingTicket || !adminLoaded) {
     return (
-      <div className="flex flex-col h-screen overflow-hidden bg-white animate-pulse">
+      <div className="flex flex-col h-[calc(100dvh-52px)] md:h-screen overflow-hidden bg-white animate-pulse">
         {/* Skeleton header */}
         <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-100">
           <div className="w-8 h-8 rounded-lg bg-gray-100" />
@@ -311,7 +311,7 @@ export default function TicketDetailPage() {
 
   if (!ticket) {
     return (
-      <div className="flex flex-col h-screen items-center justify-center gap-3">
+      <div className="flex flex-col h-[calc(100dvh-52px)] md:h-screen items-center justify-center gap-3">
         <p className="text-gray-500 text-sm">Tiket tidak ditemukan.</p>
         <button onClick={() => router.push("/dashboard/ticket")} className="text-sm text-red-600 underline">
           Kembali ke daftar tiket
@@ -322,7 +322,7 @@ export default function TicketDetailPage() {
 
   if (ticket.handled_by && ticket.handled_by !== adminName) {
     return (
-      <div className="flex flex-col h-screen overflow-hidden bg-white">
+      <div className="flex flex-col h-[calc(100dvh-52px)] md:h-screen overflow-hidden bg-white">
         <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-100 shrink-0">
           <button
             onClick={() => router.push("/dashboard/ticket")}
@@ -366,7 +366,7 @@ export default function TicketDetailPage() {
   }
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden bg-white">
+    <div className="flex flex-col h-[calc(100dvh-52px)] md:h-screen overflow-hidden bg-white">
 
       {/* ── Header ── */}
       <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-100 shrink-0">

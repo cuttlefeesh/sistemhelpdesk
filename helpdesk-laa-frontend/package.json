@@ -11,7 +11,10 @@
   "dependencies": {
     "animejs": "^3.2.2",
     "bcryptjs": "^3.0.3",
+    "jose": "^6.2.3",
+    "lru-cache": "^11.4.0",
     "next": "^16.2.3",
+    "react-markdown": "^10.1.0",
     "nodemailer": "^8.0.7",
     "pg": "^8.20.0",
     "postcss": "^8.5.10",

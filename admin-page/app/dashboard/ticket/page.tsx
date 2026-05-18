@@ -16,6 +16,8 @@ type Ticket = {
   created_at: string;
   updated_at?: string | null;
   handled_by?: string | null;
+  layanan_id?: string | null;
+  nama_layanan?: string | null;
   unread_count?: number;
 };
 
@@ -207,7 +209,7 @@ export default function TicketPage() {
   const isAnyFilterActive = !!(search || filterStatus || filterAge || filterHandledBy || filterMe || filterUnread || dateFrom || dateTo);
 
   return (
-    <div className="flex flex-col flex-1 p-8 gap-6">
+    <div className="flex flex-col flex-1 p-4 md:p-8 gap-4 md:gap-6">
       {/* Header */}
       <div className="page-header animate-fade-up">
         <h1 className="text-2xl font-bold text-gray-800">Tiket</h1>
@@ -228,7 +230,7 @@ export default function TicketPage() {
       )}
 
       {/* Stats — Design C: icon top-right, number top-left, progress bar */}
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
         {/* Total */}
         <div className="bg-white rounded-xl border border-[#e8edf5] p-[18px] transition-all duration-200 hover:shadow-[0_6px_20px_rgba(15,23,42,0.08)] hover:-translate-y-0.5">
           <div className="flex items-start justify-between">
@@ -306,7 +308,7 @@ export default function TicketPage() {
       <div className="bg-white rounded-xl shadow-sm border border-gray-100">
 
         {/* ── Filter bar ── */}
-        <div className="px-6 py-4 border-b border-gray-100 flex items-center gap-3">
+        <div className="px-4 md:px-6 py-3 md:py-4 border-b border-gray-100 flex flex-wrap items-center gap-2 md:gap-3">
           <h2 className="text-base font-semibold text-gray-700 shrink-0">
             Daftar Tiket{" "}
             <span className="text-gray-400 font-normal text-sm">({filtered.length} tiket)</span>
@@ -476,6 +478,7 @@ export default function TicketPage() {
                 <th className="th-cell w-10">No</th>
                 <th className="th-cell">ID</th>
                 <th className="th-cell">Pengguna</th>
+                <th className="th-cell">Layanan</th>
                 <th className="th-cell">Subjek</th>
                 <th className="th-cell">Deskripsi</th>
                 <th className="th-cell">Tanggal</th>
@@ -495,6 +498,7 @@ export default function TicketPage() {
                       <div className="h-4 bg-gray-100 rounded w-32 mb-1.5" />
                       <div className="h-3 bg-gray-100 rounded w-20" />
                     </td>
+                    <td className="px-6 py-4"><div className="h-4 bg-gray-100 rounded w-24" /></td>
                     <td className="px-6 py-4"><div className="h-4 bg-gray-100 rounded w-40" /></td>
                     <td className="px-6 py-4">
                       <div className="h-3 bg-gray-100 rounded w-48 mb-1.5" />
@@ -509,7 +513,7 @@ export default function TicketPage() {
                 ))
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="px-6 py-12 text-center">
+                  <td colSpan={11} className="px-6 py-12 text-center">
                     <div className="flex flex-col items-center gap-2">
                       <svg xmlns="http://www.w3.org/2000/svg" className="w-8 h-8 text-gray-200" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z" />
@@ -539,6 +543,9 @@ export default function TicketPage() {
                       <td className="px-6 py-4">
                         <p className="text-gray-800 font-medium">{ticket.nama || "—"}</p>
                         {ticket.nim && <p className="text-gray-400 text-xs font-mono">{ticket.nim}</p>}
+                      </td>
+                      <td className="px-6 py-4 text-gray-600 text-xs">
+                        {ticket.nama_layanan || <span className="text-gray-300">—</span>}
                       </td>
                       <td className="px-6 py-4 text-gray-700 max-w-[180px]">
                         <p className="truncate">{ticket.subject || "—"}</p>

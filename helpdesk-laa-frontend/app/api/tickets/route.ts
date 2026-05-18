@@ -1,29 +1,26 @@
 import { NextResponse } from "next/server";
 import pool from "@/lib/db";
+import { getSession } from "@/lib/auth";
 
-// [KODE DIPERBARUI]: Mengambil tiket KHUSUS untuk user yang sedang login
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const nim = searchParams.get("nim");
-
-  if (!nim) {
+export async function GET() {
+  const session = await getSession();
+  if (!session) {
     return NextResponse.json(
-      { status: "error", message: "NIM diperlukan" },
-      { status: 400 },
+      { status: "error", message: "Unauthorized" },
+      { status: 401 },
     );
   }
 
   try {
-    // [KODE BARU]: Query yang sudah di-INTEGRASIKAN dengan LEFT JOIN layanan_master
     const result = await pool.query(
-      `SELECT 
-          t.*, 
-          l.nama_layanan 
+      `SELECT
+          t.*,
+          l.nama_layanan
        FROM tickets t
        LEFT JOIN layanan_master l ON t.layanan_id = l.id
        WHERE t.nim = $1
        ORDER BY t.created_at DESC`,
-      [nim],
+      [session.nim_nip],
     );
 
     return NextResponse.json({ status: "success", data: result.rows });
@@ -36,25 +33,30 @@ export async function GET(request: Request) {
   }
 }
 
-// Menyimpan tiket baru (Tetap sama, tidak ada yang diubah)
 export async function POST(request: Request) {
+  const session = await getSession();
+  if (!session) {
+    return NextResponse.json(
+      { status: "error", message: "Unauthorized" },
+      { status: 401 },
+    );
+  }
+
   try {
-    // [KODE BARU]: Tambahkan layanan_id di baris ini untuk ditangkap dari frontend
-    const { id, nim, nama, subject, description, status, layanan_id } =
+    const { id, subject, description, status, layanan_id } =
       await request.json();
 
-    if (!id || !nim || !subject) {
+    if (!id || !subject) {
       return NextResponse.json(
         { status: "error", message: "Data tidak lengkap" },
         { status: 400 },
       );
     }
 
-    // [KODE BARU]: Tambahkan kolom layanan_id dan $7 ke dalam perintah INSERT
     await pool.query(
-      `INSERT INTO tickets (id, nim, nama, subject, description, status, layanan_id) 
+      `INSERT INTO tickets (id, nim, nama, subject, description, status, layanan_id)
        VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-      [id, nim, nama, subject, description, status, layanan_id || null],
+      [id, session.nim_nip, session.nama, subject, description, status, layanan_id || null],
     );
 
     return NextResponse.json({

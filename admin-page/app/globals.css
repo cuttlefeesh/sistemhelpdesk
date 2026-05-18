@@ -97,3 +97,14 @@
 .animate-fade-up {
   animation: fade-up 0.2s cubic-bezier(0.4, 0, 0.2, 1) both;
 }
+
+/* Mobile sidebar drawer — hanya aktif di bawah md (768px) */
+@media (max-width: 767px) {
+  .sidebar-drawer {
+    transform: translateX(-100%);
+    transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .sidebar-drawer-open {
+    transform: translateX(0);
+  }
+}

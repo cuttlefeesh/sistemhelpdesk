@@ -1,59 +1,70 @@
 import { NextResponse } from "next/server";
 import pool from "@/lib/db";
+import { getSession } from "@/lib/auth";
 
-// Mengambil riwayat chat berdasarkan NIM/NIP DAN Session ID
 export async function GET(request: Request) {
+  const session = await getSession();
+  if (!session) {
+    return NextResponse.json({ status: "error", message: "Unauthorized" }, { status: 401 });
+  }
+
   const { searchParams } = new URL(request.url);
-  const nimNip = searchParams.get("nimNip");
   const sessionId = searchParams.get("sessionId");
 
   try {
     if (sessionId) {
       const result = await pool.query(
         "SELECT id, role, content FROM chat_history WHERE nim_nip = $1 AND session_id = $2 ORDER BY created_at ASC",
-        [nimNip, sessionId],
+        [session.nim_nip, sessionId],
       );
       return NextResponse.json({ status: "success", data: result.rows });
     } else {
-      // [PERBAIKAN]: Mengubah role = 'user' menjadi role != 'bot' agar mahasiswa/dosen tetap muncul di sidebar
       const result = await pool.query(
-        `SELECT DISTINCT ON (session_id) session_id, content 
-         FROM chat_history 
-         WHERE nim_nip = $1 AND role != 'bot' AND session_id IS NOT NULL 
+        `SELECT DISTINCT ON (session_id) session_id, content
+         FROM chat_history
+         WHERE nim_nip = $1 AND role != 'bot' AND session_id IS NOT NULL
          ORDER BY session_id, created_at ASC`,
-        [nimNip],
+        [session.nim_nip],
       );
       return NextResponse.json({ status: "success", data: result.rows });
     }
   } catch (error) {
-    console.error("ERROR AT GET CHAT:", error); // [TAMBAHAN]: Untuk memunculkan error di terminal jika GET gagal
+    console.error("ERROR AT GET CHAT:", error);
     return NextResponse.json({ status: "error" }, { status: 500 });
   }
 }
 
-// Menyimpan pesan baru ke database beserta Session ID
 export async function POST(request: Request) {
-  const { nimNip, sessionId, role, content } = await request.json();
+  const session = await getSession();
+  if (!session) {
+    return NextResponse.json({ status: "error", message: "Unauthorized" }, { status: 401 });
+  }
+
+  const { sessionId, role, content } = await request.json();
 
   try {
     await pool.query(
       "INSERT INTO chat_history (nim_nip, session_id, role, content) VALUES ($1, $2, $3, $4)",
-      [nimNip, sessionId, role, content],
+      [session.nim_nip, sessionId, role, content],
     );
     return NextResponse.json({ status: "success" });
   } catch (error) {
-    console.error("ERROR AT POST CHAT:", error); // [TAMBAHAN]: Sangat penting untuk melihat alasan database menolak menyimpan pesan
+    console.error("ERROR AT POST CHAT:", error);
     return NextResponse.json({ status: "error" }, { status: 500 });
   }
 }
 
 export async function DELETE(request: Request) {
+  const session = await getSession();
+  if (!session) {
+    return NextResponse.json({ status: "error", message: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     const { searchParams } = new URL(request.url);
     const sessionId = searchParams.get("sessionId");
-    const nimNip = searchParams.get("nimNip");
 
-    if (!sessionId || !nimNip) {
+    if (!sessionId) {
       return NextResponse.json(
         { status: "error", message: "Data tidak lengkap" },
         { status: 400 },
@@ -62,7 +73,7 @@ export async function DELETE(request: Request) {
 
     await pool.query(
       "DELETE FROM chat_history WHERE nim_nip = $1 AND session_id = $2",
-      [nimNip, sessionId],
+      [session.nim_nip, sessionId],
     );
 
     return NextResponse.json({
@@ -70,7 +81,7 @@ export async function DELETE(request: Request) {
       message: "Chat berhasil dihapus",
     });
   } catch (error) {
-    console.error("ERROR AT DELETE CHAT:", error); // [TAMBAHAN]: Log error untuk fungsi delete
+    console.error("ERROR AT DELETE CHAT:", error);
     return NextResponse.json(
       { status: "error", message: "Gagal menghapus chat" },
       { status: 500 },

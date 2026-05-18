@@ -65,6 +65,8 @@ export function knowledgeFields(row: {
   platform?: string | null;
   pihak?: string | null;
   catatan?: string | null;
+  unit_pengelola?: string | null;
+  kontak_referral?: string | null;
 }): Record<string, string | null | undefined> {
   return {
     intent: row.intent,
@@ -76,5 +78,7 @@ export function knowledgeFields(row: {
     platform: row.platform,
     pihak: row.pihak,
     catatan: row.catatan,
+    unit_pengelola: row.unit_pengelola,
+    kontak_referral: row.kontak_referral,
   };
 }

@@ -1,14 +1,22 @@
 import { NextResponse } from "next/server";
 import pool from "@/lib/db";
+import { getSession } from "@/lib/auth";
 
 export async function POST(request: Request) {
-  const { nimNip, email } = await request.json();
+  const session = await getSession();
+  if (!session) {
+    return NextResponse.json(
+      { status: "error", message: "Unauthorized" },
+      { status: 401 },
+    );
+  }
+
+  const { email } = await request.json();
 
   try {
-    // Update kolom email berdasarkan nim_nip
     const result = await pool.query(
-      "UPDATE users SET email = $1 WHERE nim_nip = $2 RETURNING *",
-      [email, nimNip],
+      "UPDATE users SET email = $1 WHERE nim_nip = $2 RETURNING id, nim_nip, email",
+      [email, session.nim_nip],
     );
 
     if (result.rowCount === 0) {
@@ -21,7 +29,6 @@ export async function POST(request: Request) {
     return NextResponse.json({
       status: "success",
       message: "Email berhasil diperbarui di database",
-      data: result.rows[0],
     });
   } catch (error) {
     console.error(error);

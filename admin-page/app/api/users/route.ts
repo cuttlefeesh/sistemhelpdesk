@@ -2,10 +2,14 @@ import { NextResponse } from "next/server";
 import pool from "@/lib/db";
 import bcrypt from "bcryptjs";
 import { generateEmbedding, dosenFields, knowledgeFields as _k } from "@/lib/embedding";
+import { getSession } from "@/lib/auth";
 
 void _k;
 
 export async function GET(request: Request) {
+  const session = await getSession();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   try {
     const role = new URL(request.url).searchParams.get("role");
     if (!role) return NextResponse.json({ error: "Parameter role wajib diisi" }, { status: 400 });
@@ -23,6 +27,9 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const session = await getSession();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   try {
     const { role, nim_nip, nama, email, prodi, kelas, kode_dosen, nidn_nuptk } =
       await request.json();

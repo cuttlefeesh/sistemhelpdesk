@@ -1,8 +1,24 @@
-// File: app/api/tickets/messages/route.ts
 import { NextResponse } from "next/server";
 import pool from "@/lib/db";
+import { getSession } from "@/lib/auth";
+
+async function verifyTicketOwnership(ticketId: string, nimNip: string): Promise<boolean> {
+  const result = await pool.query(
+    "SELECT id FROM tickets WHERE id = $1 AND nim = $2",
+    [ticketId, nimNip],
+  );
+  return (result.rowCount ?? 0) > 0;
+}
 
 export async function GET(request: Request) {
+  const session = await getSession();
+  if (!session) {
+    return NextResponse.json(
+      { status: "error", message: "Unauthorized" },
+      { status: 401 },
+    );
+  }
+
   const { searchParams } = new URL(request.url);
   const ticketId = searchParams.get("ticketId");
 
@@ -13,8 +29,15 @@ export async function GET(request: Request) {
     );
   }
 
+  const isOwner = await verifyTicketOwnership(ticketId, session.nim_nip);
+  if (!isOwner) {
+    return NextResponse.json(
+      { status: "error", message: "Akses ditolak" },
+      { status: 403 },
+    );
+  }
+
   try {
-    // Ambil pesan berdasarkan ticket_id, urutkan dari yang terlama ke terbaru (ASC)
     const result = await pool.query(
       "SELECT * FROM ticket_messages WHERE ticket_id = $1 ORDER BY created_at ASC",
       [ticketId],
@@ -30,16 +53,37 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  try {
-    const { ticket_id, sender_type, sender_id, sender_name, message } =
-      await request.json();
+  const session = await getSession();
+  if (!session) {
+    return NextResponse.json(
+      { status: "error", message: "Unauthorized" },
+      { status: 401 },
+    );
+  }
 
-    // Simpan pesan baru ke database (created_at otomatis diisi NOW())
+  try {
+    const { ticket_id, message } = await request.json();
+
+    if (!ticket_id || !message) {
+      return NextResponse.json(
+        { status: "error", message: "Data tidak lengkap" },
+        { status: 400 },
+      );
+    }
+
+    const isOwner = await verifyTicketOwnership(ticket_id, session.nim_nip);
+    if (!isOwner) {
+      return NextResponse.json(
+        { status: "error", message: "Akses ditolak" },
+        { status: 403 },
+      );
+    }
+
     const result = await pool.query(
-      `INSERT INTO ticket_messages 
-      (ticket_id, sender_type, sender_id, sender_name, message, is_read, created_at) 
-      VALUES ($1, $2, $3, $4, $5, false, NOW()) RETURNING *`,
-      [ticket_id, sender_type, sender_id, sender_name, message],
+      `INSERT INTO ticket_messages
+      (ticket_id, sender_type, sender_id, sender_name, message, is_read, created_at)
+      VALUES ($1, 'user', $2, $3, $4, false, NOW()) RETURNING *`,
+      [ticket_id, session.nim_nip, session.nama, message],
     );
 
     return NextResponse.json({ status: "success", data: result.rows[0] });

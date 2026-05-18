@@ -1,9 +1,12 @@
-import os 
-from dotenv import load_dotenv 
+import os
+from dotenv import load_dotenv
 
 # api_chatbot.py
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 from pydantic import BaseModel
 import psycopg2
 import ollama
@@ -20,10 +23,19 @@ load_dotenv()
 # Inisialisasi FastAPI
 app = FastAPI()
 
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 # Mengizinkan Next.js (frontend) untuk memanggil API ini
+_allowed_origins = [o for o in [
+    "http://localhost:3000",
+    os.getenv("FRONTEND_URL", ""),
+] if o]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"], # Ganti dengan URL frontend Anda saat produksi
+    allow_origins=_allowed_origins,
     allow_credentials=True,
     allow_methods=["POST", "OPTIONS"],
     allow_headers=["Content-Type", "Accept", "Authorization"],
@@ -173,7 +185,8 @@ def fetch_dynamic_context(query_text, query_embedding, table_name, top_k=2, extr
         cur.execute(query_sql, final_params)
         return "\n".join([str(dict(zip(columns, row))) for row in cur.fetchall()])
     except Exception as e:
-        return f"Error Eksekusi DB: {e}"
+        print(f"[DB ERROR] fetch_dynamic_context: {e}")
+        return ""
     finally:
         cur.close()
         conn.close()
@@ -190,7 +203,8 @@ class ChatRequest(BaseModel):
 
 # --- ENDPOINT UTAMA CHATBOT ---
 @app.post("/api/chat-bot")
-async def process_chat(req: ChatRequest):
+@limiter.limit("20/minute")
+async def process_chat(req: ChatRequest, request: Request):
     injection_filter = PromptInjectionFilter()
     raw_prompt = req.query
     
@@ -214,15 +228,20 @@ async def process_chat(req: ChatRequest):
     is_prosedur = any(k in current_lower for k in ["prosedur", "surat", "bagaimana", "pengajuan", "cuti", "cara", "syarat", "mekanisme", "melihat", "waktu", "dimana", "print", "membuat", "mengajukan", "mengambil", "melakukan", "cetak", "layanan", "terbit", "daftar", "mendaftar", "meminjam", "toss"])
     is_user_query = any(k in current_lower for k in ["dosen", "mahasiswa", "nim", "nip", "kelas", "angkatan"])
 
-    sql_users_filter = " AND role = 'dosen'" if req.user_mode.lower() == "mahasiswa" else ""
+    # Validasi user_mode dengan allowlist sebelum diinterpolasi ke SQL
+    _VALID_ROLES = {"mahasiswa", "dosen"}
+    safe_role = req.user_mode.lower() if req.user_mode.lower() in _VALID_ROLES else "mahasiswa"
+
+    sql_users_filter = " AND role = 'dosen'" if safe_role == "mahasiswa" else ""
     # Filter: Ambil layanan sesuai role user saat ini, ATAU yang untuk umum ('all')
-    safe_role = req.user_mode.lower()
     sql_kb_filter = f" AND (LOWER(tipe_pengguna) = '{safe_role}' OR LOWER(tipe_pengguna) = 'all')"
 
     if intent == "prosedur" or (is_prosedur and not is_user_query):
         context = fetch_dynamic_context(clean_query, query_embed, "knowledge_base", top_k=4, extra_filter=sql_kb_filter)
     elif intent == "dosen" or (is_user_query and not is_prosedur):
-        context = fetch_dynamic_context(clean_query, query_embed, "users", top_k=3, extra_filter=sql_users_filter)
+        ctx_users = fetch_dynamic_context(clean_query, query_embed, "users", top_k=3, extra_filter=sql_users_filter)
+        ctx_kb = fetch_dynamic_context(clean_query, query_embed, "knowledge_base", top_k=2, extra_filter=sql_kb_filter)
+        context = f"[Data Pengguna]:\n{ctx_users}\n\n[Knowledge Base]:\n{ctx_kb}"
     else:
         ctx_users = fetch_dynamic_context(clean_query, query_embed, "users", top_k=2, extra_filter=sql_users_filter)
         ctx_kb = fetch_dynamic_context(clean_query, query_embed, "knowledge_base", top_k=4, extra_filter=sql_kb_filter)
@@ -231,21 +250,27 @@ async def process_chat(req: ChatRequest):
     # 4. Susun System Prompt
     base_security_prompt = generate_system_prompt(
         role=f"asisten chatbot resmi untuk Layanan Administrasi Akademik (LAA) FTE Telkom University yang sedang melayani seorang {req.user_mode}",
-        task="memberikan informasi HANYA berdasarkan KONTEKS DATABASE yang disediakan"
+        task="memberikan informasi HANYA berdasarkan KONTEKS yang disediakan"
     )
 
     full_system_instructions = f"""{base_security_prompt}
 
-Informasi LAA:
-No HP/WA = +62 8122-4253-349 | Email = laa.fte@telkomuniversity.ac.id. | Lokasi = Gedung TULT lantai 1, ruang 0108
+Informasi Kontak LAA FTE (gunakan format ini PERSIS saat menyebutkan kontak LAA):
+Jika Anda membutuhkan informasi kontak LAA FTE, Anda bisa hubungi kami melalui:
+
+- **No. HP/WA:** +62 8122-4253-349
+- **Email:** laa.fte@telkomuniversity.ac.id
+- **Lokasi:** Gedung TULT lantai 1, ruang 0108
 
 ATURAN PENTING UNTUK MENJAWAB:
 1. LANGSUNG KE INTINYA & NATURAL.
 2. RESPON PROAKTIF & EMPATIK.
 3. KOREKSI TEBAKAN PENGGUNA JIKA SALAH.
 4. NIM dan NIP disimpan dalam 'nim_nip'.
-5. STRICT NOT FOUND: Jika tidak ada di konteks, jawab: "Mohon maaf, informasi tersebut tidak ditemukan di database kami."
+5. STRICT NOT FOUND: Jika tidak ada di konteks, jawab: "Mohon maaf, informasi tersebut tidak tersedia dalam sistem kami."
 6. FORMAT TERSTRUKTUR & RAPI menggunakan Markdown.
+7. LAYANAN REFERRAL: Jika konteks mengandung entri dengan 'tipe_layanan': 'Referral', JANGAN katakan tidak ditemukan. Jelaskan bahwa layanan tersebut bukan tanggung jawab LAA FTE, berikan informasi singkat dari field 'deskripsi', lalu arahkan pengguna ke 'unit_pengelola' dan 'kontak_referral' yang ada di konteks.
+8. BAHASA: JANGAN pernah menyebut kata 'database' dalam jawaban. Ketika menjelaskan keterbatasan LAA, gunakan kalimat: "LAA FTE hanya menangani layanan administrasi akademik FTE Telkom University & informasi dosen." — JANGAN sebutkan "data dosen" sebagai satu-satunya layanan LAA.
 
 KONTEKS DATABASE:
 {context}
@@ -284,6 +309,7 @@ KONTEKS DATABASE:
         response = ollama_client.chat(model=LLM_MODEL, messages=messages, stream=False, options={"num_ctx": 2048})
         return {"output": response['message']['content']}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"[LLM ERROR] process_chat: {e}")
+        raise HTTPException(status_code=500, detail="Terjadi kesalahan server. Silakan coba lagi.")
 
 # Jalankan server menggunakan command: uvicorn api_chatbot:app --host 0.0.0.0 --port 8000

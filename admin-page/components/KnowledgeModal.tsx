@@ -6,6 +6,9 @@ export type KnowledgeEntry = {
   id: number;
   intent: string;
   tipe_pengguna: string;
+  tipe_layanan: string | null;
+  unit_pengelola: string | null;
+  kontak_referral: string | null;
   deskripsi: string;
   prosedur: string;
   syarat: string;
@@ -16,7 +19,11 @@ export type KnowledgeEntry = {
   updated_at: string;
 };
 
-export type KnowledgeFormData = Omit<KnowledgeEntry, "id" | "updated_at">;
+export type KnowledgeFormData = Omit<KnowledgeEntry, "id" | "updated_at" | "tipe_layanan" | "unit_pengelola" | "kontak_referral"> & {
+  tipe_layanan: string;
+  unit_pengelola: string;
+  kontak_referral: string;
+};
 
 type Props = {
   entry?: KnowledgeEntry | null;
@@ -25,11 +32,12 @@ type Props = {
 };
 
 const EMPTY: KnowledgeFormData = {
-  intent: "", tipe_pengguna: "", deskripsi: "", prosedur: "",
-  syarat: "", estimasi_waktu: "", platform: "", pihak: "", catatan: "",
+  intent: "", tipe_pengguna: "", tipe_layanan: "LAA", unit_pengelola: "", kontak_referral: "",
+  deskripsi: "", prosedur: "", syarat: "", estimasi_waktu: "", platform: "", pihak: "", catatan: "",
 };
 
 const TIPE_OPTIONS = ["Mahasiswa", "Dosen"];
+const LAA_ONLY_KEYS: (keyof KnowledgeFormData)[] = ["prosedur", "syarat", "estimasi_waktu", "platform", "pihak", "catatan"];
 
 type Field = { key: keyof KnowledgeFormData; label: string; required?: boolean; multiline?: boolean };
 
@@ -47,12 +55,25 @@ const FIELDS: Field[] = [
 export default function KnowledgeModal({ entry, onClose, onSave }: Props) {
   const [form, setForm] = useState<KnowledgeFormData>(EMPTY);
   const [error, setError] = useState("");
+  const [layananOptions, setLayananOptions] = useState<{ id: number; nama_layanan: string; tipe_pengguna: string }[]>([]);
+
+  useEffect(() => {
+    fetch("/api/layanan-master")
+      .then((r) => r.json())
+      .then((data) => { if (Array.isArray(data)) setLayananOptions(data); })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (entry) {
       const { id, updated_at, ...rest } = entry;
       void id; void updated_at;
-      setForm(rest);
+      setForm({
+        ...rest,
+        tipe_layanan: rest.tipe_layanan ?? "LAA",
+        unit_pengelola: rest.unit_pengelola ?? "",
+        kontak_referral: rest.kontak_referral ?? "",
+      });
     } else {
       setForm(EMPTY);
     }
@@ -67,8 +88,24 @@ export default function KnowledgeModal({ entry, onClose, onSave }: Props) {
       setError("Intent wajib diisi.");
       return;
     }
+    if (form.tipe_layanan === "Referral" && !form.unit_pengelola.trim()) {
+      setError("Unit Pengelola wajib diisi untuk tipe Referral.");
+      return;
+    }
     onSave(form);
   };
+
+  const isReferral = form.tipe_layanan === "Referral";
+
+  const filteredLayananOptions = form.tipe_pengguna
+    ? layananOptions.filter((o) => o.tipe_pengguna === form.tipe_pengguna)
+    : layananOptions;
+
+  const handleTipeLayananChange = (value: string) =>
+    setForm((prev) => ({ ...prev, tipe_layanan: value, intent: "" }));
+
+  const handleTipePenggunaChange = (value: string) =>
+    setForm((prev) => ({ ...prev, tipe_pengguna: value, intent: "" }));
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
@@ -88,59 +125,146 @@ export default function KnowledgeModal({ entry, onClose, onSave }: Props) {
         {/* Form scrollable */}
         <form onSubmit={handleSubmit} className="flex flex-col overflow-hidden">
           <div className="px-6 py-5 overflow-y-auto flex flex-col gap-4">
-            {FIELDS.map(({ key, label, required, multiline }) => (
-              key === "deskripsi" ? (
-                <div key={key} className="contents">
-                  {/* Tipe Pengguna dropdown — setelah Intent */}
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-sm font-medium text-gray-700">Tipe Pengguna</label>
-                    <select
-                      value={form.tipe_pengguna}
-                      onChange={(e) => set("tipe_pengguna", e.target.value)}
-                      className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 outline-none focus:ring-2 focus:ring-red-300 transition bg-white"
-                    >
-                      <option value="">-- Pilih Tipe Pengguna --</option>
-                      {TIPE_OPTIONS.map((opt) => (
-                        <option key={opt} value={opt}>{opt}</option>
-                      ))}
-                    </select>
+            {FIELDS.map(({ key, label, required, multiline }) => {
+              if (LAA_ONLY_KEYS.includes(key) && isReferral) return null;
+
+              if (key === "intent") return null;
+
+              if (key === "deskripsi") {
+                return (
+                  <div key={key} className="contents">
+                    {/* Tipe Layanan dropdown */}
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-sm font-medium text-gray-700">Tipe Layanan</label>
+                      <select
+                        value={form.tipe_layanan}
+                        onChange={(e) => handleTipeLayananChange(e.target.value)}
+                        className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 outline-none focus:ring-2 focus:ring-red-300 transition bg-white"
+                      >
+                        <option value="LAA">LAA</option>
+                        <option value="Referral">Referral</option>
+                      </select>
+                    </div>
+                    {/* Tipe Pengguna dropdown */}
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-sm font-medium text-gray-700">Tipe Pengguna</label>
+                      <select
+                        value={form.tipe_pengguna}
+                        onChange={(e) => handleTipePenggunaChange(e.target.value)}
+                        className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 outline-none focus:ring-2 focus:ring-red-300 transition bg-white"
+                      >
+                        <option value="">-- Pilih Tipe Pengguna --</option>
+                        {TIPE_OPTIONS.map((opt) => (
+                          <option key={opt} value={opt}>{opt}</option>
+                        ))}
+                      </select>
+                    </div>
+                    {/* Intent */}
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-sm font-medium text-gray-700">
+                        Intent <span className="text-red-500">*</span>
+                      </label>
+                      {isReferral ? (
+                        <input
+                          type="text"
+                          value={form.intent}
+                          onChange={(e) => set("intent", e.target.value)}
+                          placeholder="Masukkan nama layanan referral..."
+                          className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 placeholder-gray-400 outline-none focus:ring-2 focus:ring-red-300 transition"
+                        />
+                      ) : (
+                        <select
+                          value={form.intent}
+                          onChange={(e) => set("intent", e.target.value)}
+                          className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 outline-none focus:ring-2 focus:ring-red-300 transition bg-white"
+                        >
+                          <option value="">-- Pilih Layanan --</option>
+                          {form.tipe_pengguna ? (
+                            filteredLayananOptions.map((o) => (
+                              <option key={o.id} value={o.nama_layanan}>{o.nama_layanan}</option>
+                            ))
+                          ) : (
+                            ["Mahasiswa", "Dosen"].map((tipe) => {
+                              const opts = layananOptions.filter((o) => o.tipe_pengguna === tipe);
+                              return opts.length > 0 ? (
+                                <optgroup key={tipe} label={`Layanan ${tipe}`}>
+                                  {opts.map((o) => (
+                                    <option key={o.id} value={o.nama_layanan}>{o.nama_layanan}</option>
+                                  ))}
+                                </optgroup>
+                              ) : null;
+                            })
+                          )}
+                        </select>
+                      )}
+                    </div>
+                    {/* Deskripsi */}
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-sm font-medium text-gray-700">{label}</label>
+                      <textarea
+                        value={form[key]}
+                        onChange={(e) => set(key, e.target.value)}
+                        placeholder={`Masukkan ${label.toLowerCase()}...`}
+                        rows={3}
+                        className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 placeholder-gray-400 outline-none focus:ring-2 focus:ring-red-300 transition resize-none"
+                      />
+                    </div>
+                    {/* Field khusus Referral */}
+                    {isReferral && (
+                      <>
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-sm font-medium text-gray-700">
+                            Unit Pengelola <span className="text-red-500">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            value={form.unit_pengelola}
+                            onChange={(e) => set("unit_pengelola", e.target.value)}
+                            placeholder="Contoh: Ditmawa, BAK, Kemahasiswaan..."
+                            className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 placeholder-gray-400 outline-none focus:ring-2 focus:ring-red-300 transition"
+                          />
+                        </div>
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-sm font-medium text-gray-700">Kontak Referral</label>
+                          <textarea
+                            value={form.kontak_referral}
+                            onChange={(e) => set("kontak_referral", e.target.value)}
+                            placeholder="Contoh: Gedung Rektorat Lt. 2, atau https://ditmawa.its.ac.id"
+                            rows={3}
+                            className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 placeholder-gray-400 outline-none focus:ring-2 focus:ring-red-300 transition resize-none"
+                          />
+                        </div>
+                      </>
+                    )}
                   </div>
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-sm font-medium text-gray-700">{label}</label>
+                );
+              }
+
+              return (
+                <div key={key} className="flex flex-col gap-1.5">
+                  <label className="text-sm font-medium text-gray-700">
+                    {label} {required && <span className="text-red-500">*</span>}
+                  </label>
+                  {multiline ? (
                     <textarea
-                      value={form[key]}
+                      value={form[key] as string}
                       onChange={(e) => set(key, e.target.value)}
                       placeholder={`Masukkan ${label.toLowerCase()}...`}
                       rows={3}
                       className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 placeholder-gray-400 outline-none focus:ring-2 focus:ring-red-300 transition resize-none"
                     />
-                  </div>
+                  ) : (
+                    <input
+                      type="text"
+                      value={form[key] as string}
+                      onChange={(e) => set(key, e.target.value)}
+                      placeholder={`Masukkan ${label.toLowerCase()}...`}
+                      className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 placeholder-gray-400 outline-none focus:ring-2 focus:ring-red-300 transition"
+                    />
+                  )}
                 </div>
-              ) : (
-              <div key={key} className="flex flex-col gap-1.5">
-                <label className="text-sm font-medium text-gray-700">
-                  {label} {required && <span className="text-red-500">*</span>}
-                </label>
-                {multiline ? (
-                  <textarea
-                    value={form[key]}
-                    onChange={(e) => set(key, e.target.value)}
-                    placeholder={`Masukkan ${label.toLowerCase()}...`}
-                    rows={3}
-                    className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 placeholder-gray-400 outline-none focus:ring-2 focus:ring-red-300 transition resize-none"
-                  />
-                ) : (
-                  <input
-                    type="text"
-                    value={form[key]}
-                    onChange={(e) => set(key, e.target.value)}
-                    placeholder={`Masukkan ${label.toLowerCase()}...`}
-                    className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 placeholder-gray-400 outline-none focus:ring-2 focus:ring-red-300 transition"
-                  />
-                )}
-              </div>
-              )
-            ))}
+              );
+            })}
             {error && <p className="text-red-500 text-xs">{error}</p>}
           </div>
 

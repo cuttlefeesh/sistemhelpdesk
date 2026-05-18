@@ -2,8 +2,12 @@ import { NextResponse } from "next/server";
 import pool from "@/lib/db";
 import bcrypt from "bcryptjs";
 import { generateEmbedding, dosenFields } from "@/lib/embedding";
+import { getSession } from "@/lib/auth";
 
 export async function POST(request: Request) {
+  const session = await getSession();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   try {
     const rows: { nama: string; nip: string; kode_dosen?: string; nidn_nuptk?: string; email?: string; prodi?: string }[] =
       await request.json();
@@ -25,7 +29,7 @@ export async function POST(request: Request) {
 
         // Generate embedding langsung saat insert
         const embedding = await generateEmbedding(dosenFields({
-          nip: nip || null,
+          nim_nip: nip || null,
           nama: row.nama.trim(),
           kode_dosen: row.kode_dosen,
           nidn_nuptk: row.nidn_nuptk,

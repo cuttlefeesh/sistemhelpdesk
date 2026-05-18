@@ -1,9 +1,36 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { verifyToken, cookieName } from "@/lib/auth";
+import { rateLimit } from "@/lib/rateLimit";
+
+const loginLimiter = rateLimit({ interval: 15 * 60_000, limit: 10 });
+const generalLimiter = rateLimit({ interval: 60_000, limit: 60 });
+
+function getIP(req: NextRequest): string {
+  return (
+    req.headers.get("x-forwarded-for")?.split(",")[0].trim() ??
+    req.headers.get("x-real-ip") ??
+    "127.0.0.1"
+  );
+}
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  // Rate limiting untuk semua API route
+  if (pathname.startsWith("/api/")) {
+    const ip = getIP(request);
+    const limiter = pathname === "/api/auth/login" ? loginLimiter : generalLimiter;
+    if (!limiter.check(ip)) {
+      return NextResponse.json(
+        { error: "Terlalu banyak permintaan. Coba lagi sebentar lagi." },
+        {
+          status: 429,
+          headers: pathname === "/api/auth/login" ? { "Retry-After": "900" } : {},
+        },
+      );
+    }
+  }
 
   // Proteksi route /dashboard
   if (pathname.startsWith("/dashboard")) {
@@ -36,5 +63,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/", "/dashboard/:path*"],
+  matcher: ["/", "/dashboard/:path*", "/api/:path*"],
 };

@@ -1,30 +1,37 @@
 import { NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { generateEmbedding, knowledgeFields } from "@/lib/embedding";
+import { getSession } from "@/lib/auth";
 
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const session = await getSession();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   try {
     const { id } = await params;
-    const { intent, tipe_pengguna, deskripsi, prosedur, syarat, estimasi_waktu, platform, pihak, catatan } =
+    const { intent, tipe_pengguna, tipe_layanan, unit_pengelola, kontak_referral,
+            deskripsi, prosedur, syarat, estimasi_waktu, platform, pihak, catatan } =
       await request.json();
 
     if (!intent) {
       return NextResponse.json({ error: "Intent wajib diisi" }, { status: 400 });
     }
 
-    // Re-generate embedding dengan konten terbaru
     const embedding = await generateEmbedding(knowledgeFields({
       intent, tipe_pengguna, deskripsi, prosedur, syarat, estimasi_waktu, platform, pihak, catatan,
+      unit_pengelola, kontak_referral,
     }));
 
     const result = await pool.query(
       `UPDATE knowledge_base
-       SET intent=$1, tipe_pengguna=$2, deskripsi=$3, prosedur=$4, syarat=$5,
-           estimasi_waktu=$6, platform=$7, pihak=$8, catatan=$9, updated_at=now(),
-           embedding=$10::vector
-       WHERE id=$11
-       RETURNING id, intent, tipe_pengguna, deskripsi, prosedur, syarat, estimasi_waktu, platform, pihak, catatan, updated_at`,
-      [intent, tipe_pengguna, deskripsi, prosedur, syarat, estimasi_waktu, platform, pihak, catatan,
+       SET intent=$1, tipe_pengguna=$2, tipe_layanan=$3, unit_pengelola=$4, kontak_referral=$5,
+           deskripsi=$6, prosedur=$7, syarat=$8, estimasi_waktu=$9, platform=$10,
+           pihak=$11, catatan=$12, updated_at=now(), embedding=$13::vector
+       WHERE id=$14
+       RETURNING id, intent, tipe_pengguna, tipe_layanan, unit_pengelola, kontak_referral,
+                 deskripsi, prosedur, syarat, estimasi_waktu, platform, pihak, catatan, updated_at`,
+      [intent, tipe_pengguna, tipe_layanan ?? "LAA", unit_pengelola, kontak_referral,
+       deskripsi, prosedur, syarat, estimasi_waktu, platform, pihak, catatan,
        embedding ? JSON.stringify(embedding) : null, id]
     );
 
@@ -40,6 +47,9 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 }
 
 export async function DELETE(_: Request, { params }: { params: Promise<{ id: string }> }) {
+  const session = await getSession();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   try {
     const { id } = await params;
     const result = await pool.query("DELETE FROM knowledge_base WHERE id=$1", [id]);

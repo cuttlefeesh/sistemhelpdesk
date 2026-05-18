@@ -2,8 +2,12 @@ import { NextResponse } from "next/server";
 import pool from "@/lib/db";
 import bcrypt from "bcryptjs";
 import { generateEmbedding, dosenFields } from "@/lib/embedding";
+import { getSession } from "@/lib/auth";
 
 export async function GET() {
+  const session = await getSession();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   try {
     const result = await pool.query(
       `SELECT id, nama, nip, kode_dosen, nidn_nuptk, email, prodi
@@ -17,6 +21,9 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const session = await getSession();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   try {
     const { nama, nip, kode_dosen, nidn_nuptk, email, prodi } = await request.json();
     if (!nama || !nip) {
@@ -24,7 +31,7 @@ export async function POST(request: Request) {
     }
 
     const password = await bcrypt.hash(nip, 10);
-    const embedding = await generateEmbedding(dosenFields({ nip, nama, kode_dosen, nidn_nuptk, email, prodi }));
+    const embedding = await generateEmbedding(dosenFields({ nim_nip: nip, nama, kode_dosen, nidn_nuptk, email, prodi }));
 
     const result = await pool.query(
       `INSERT INTO user_dosen (nama, nip, kode_dosen, nidn_nuptk, email, password, prodi, embedding)

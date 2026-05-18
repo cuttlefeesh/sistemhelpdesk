@@ -5,6 +5,11 @@ export function tipeColor(tipe: string): string {
   return "bg-gray-100 text-gray-600";
 }
 
+export function tipoLayananColor(tipe: string | null): string {
+  if (tipe === "Referral") return "bg-orange-100 text-orange-700";
+  return "bg-blue-100 text-blue-700";
+}
+
 export function prodiColor(prodi: string): string {
   const p = prodi.toLowerCase();
   if (p === "s1 teknik elektro")         return "bg-blue-100 text-blue-700";
