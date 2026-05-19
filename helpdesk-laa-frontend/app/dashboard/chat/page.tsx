@@ -137,7 +137,7 @@ function ChatPageContent() {
       }
 
       // Kirim ke Python backend
-      const response = await fetch("http://localhost:8000/api/chat-bot", {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"}/api/chat-bot`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
