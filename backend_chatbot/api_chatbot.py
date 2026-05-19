@@ -217,7 +217,15 @@ async def process_chat(req: ChatRequest, request: Request):
     
     # 2. Ambil konteks & embedding
     user_msgs = [m.content for m in req.history if m.role == "user"]
-    is_follow_up = any(word in current_lower.split() for word in ["nya", "nya?", "kalau", "dia", "beliau"]) or len(current_lower.split()) <= 3
+    _FOLLOWUP_WORDS = ["nya", "nya?", "kalau", "dia", "beliau"]
+    _DISSATISFACTION_WORDS = ["kurang", "gak", "ngga", "nggak", "tidak", "bingung",
+                              "jelas", "detail", "lengkap", "paham", "mengerti",
+                              "maksudnya", "jelasin", "maksud"]
+    is_follow_up = (
+        any(word in current_lower.split() for word in _FOLLOWUP_WORDS)
+        or any(word in current_lower.split() for word in _DISSATISFACTION_WORDS)
+        or len(current_lower.split()) <= 3
+    )
     search_query = f"{user_msgs[-1]} {safe_prompt}" if is_follow_up and user_msgs else safe_prompt
     
     intent = get_intent(safe_prompt)
@@ -255,7 +263,7 @@ async def process_chat(req: ChatRequest, request: Request):
 
     full_system_instructions = f"""{base_security_prompt}
 
-Informasi Kontak LAA FTE (gunakan format ini PERSIS saat menyebutkan kontak LAA):
+Informasi Kontak LAA FTE (HANYA gunakan format ini jika user secara eksplisit bertanya tentang kontak/lokasi LAA, ATAU jika informasi tidak tersedia dan perlu eskalasi — JANGAN sertakan di setiap jawaban):
 Jika Anda membutuhkan informasi kontak LAA FTE, Anda bisa hubungi kami melalui:
 
 - **No. HP/WA:** +62 8122-4253-349
@@ -271,6 +279,10 @@ ATURAN PENTING UNTUK MENJAWAB:
 6. FORMAT TERSTRUKTUR & RAPI menggunakan Markdown.
 7. LAYANAN REFERRAL: Jika konteks mengandung entri dengan 'tipe_layanan': 'Referral', JANGAN katakan tidak ditemukan. Jelaskan bahwa layanan tersebut bukan tanggung jawab LAA FTE, berikan informasi singkat dari field 'deskripsi', lalu arahkan pengguna ke 'unit_pengelola' dan 'kontak_referral' yang ada di konteks.
 8. BAHASA: JANGAN pernah menyebut kata 'database' dalam jawaban. Ketika menjelaskan keterbatasan LAA, gunakan kalimat: "LAA FTE hanya menangani layanan administrasi akademik FTE Telkom University & informasi dosen." — JANGAN sebutkan "data dosen" sebagai satu-satunya layanan LAA.
+9. ESKALASI TIKET LAA:
+   - HANYA jika pertanyaan JELAS berkaitan dengan layanan LAA (ada entri relevan di konteks dengan tipe_layanan='LAA') DAN informasi tidak tersedia atau membutuhkan penanganan langsung admin: tambahkan teks "[ESKALASI]" di AWAL jawaban (sebelum kalimat lainnya), lalu sarankan membuat tiket: "Untuk mendapatkan penanganan lebih lanjut, silakan buat tiket melalui menu **Tiket** di dashboard Anda."
+   - JIKA pertanyaan di luar cakupan LAA/Referral (pertanyaan umum, teknologi, gaya hidup, dll): JANGAN sertakan "[ESKALASI]", cukup jawab bahwa pertanyaan tersebut di luar layanan LAA FTE.
+10. EKSPRESI KETIDAKPUASAN: Jika pengguna mengungkapkan ketidakpuasan, kebingungan, atau meminta klarifikasi lebih lanjut (misal: "kurang jelas", "gak ngerti", "bingung", "maksudnya apa") atas topik yang BERKAITAN dengan layanan LAA, dan informasi lebih detail tidak tersedia dalam konteks: gunakan aturan ESKALASI TIKET (Rule 9) — tambahkan [ESKALASI] dan arahkan ke tiket. JANGAN jawab "informasi tidak tersedia" untuk ekspresi frustrasi atas topik LAA.
 
 KONTEKS DATABASE:
 {context}
@@ -307,7 +319,13 @@ KONTEKS DATABASE:
     try:
         # Panggil ollama tanpa stream agar mudah diterima frontend
         response = ollama_client.chat(model=LLM_MODEL, messages=messages, stream=False, options={"num_ctx": 2048})
-        return {"output": response['message']['content']}
+        response_text = response['message']['content']
+
+        ESCALATION_MARKER = "[ESKALASI]"
+        suggest_ticket = ESCALATION_MARKER in response_text
+        response_text = response_text.replace(ESCALATION_MARKER, "").strip()
+
+        return {"output": response_text, "suggest_ticket": suggest_ticket}
     except Exception as e:
         print(f"[LLM ERROR] process_chat: {e}")
         raise HTTPException(status_code=500, detail="Terjadi kesalahan server. Silakan coba lagi.")

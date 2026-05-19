@@ -23,6 +23,7 @@ function ChatPageContent() {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [currentSessionId, setCurrentSessionId] = useState(() => Date.now().toString());
+  const [suggestTicket, setSuggestTicket] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Scroll ke bawah setiap ada pesan baru
@@ -42,6 +43,7 @@ function ChatPageContent() {
   }, [sessionFromUrl]);
 
   const loadSpecificSession = async (sessionId: string) => {
+    setSuggestTicket(false);
     try {
       const res = await fetch(`/api/chat?sessionId=${sessionId}`);
       const result = await res.json();
@@ -63,6 +65,7 @@ function ChatPageContent() {
 
   const handleNewChat = () => {
     if (confirm("Mulai percakapan baru?")) {
+      setSuggestTicket(false);
       router.push("/dashboard/chat");
     }
   };
@@ -111,6 +114,7 @@ function ChatPageContent() {
 
     setMessages((prev) => [...prev, userMessage]);
     setInput("");
+    setSuggestTicket(false);
     setIsLoading(true);
 
     const activeSessionId = currentSessionId;
@@ -145,6 +149,7 @@ function ChatPageContent() {
 
       const data = await response.json();
       const botContent = data.output || "Maaf, saya sedang tidak bisa memproses permintaan Anda.";
+      setSuggestTicket(data.suggest_ticket === true);
       await saveBotReply(botContent, activeSessionId);
     } catch {
       await saveBotReply("Terjadi kesalahan jaringan. Silakan coba lagi.", activeSessionId);
@@ -174,23 +179,38 @@ function ChatPageContent() {
 
       {/* Pesan */}
       <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 bg-gray-50">
-        {messages.map((msg) => (
-          <div key={msg.id} className={`flex ${msg.role !== "bot" ? "justify-end" : "justify-start"}`}>
-            <div
-              className={`max-w-[85%] md:max-w-[75%] p-4 rounded-xl shadow-sm ${
-                msg.role !== "bot"
-                  ? "bg-red-600 text-white rounded-br-none"
-                  : "bg-white border border-gray-200 text-gray-800 rounded-bl-none"
-              }`}
-            >
-              {msg.role !== "bot" ? (
-                <span className="whitespace-pre-wrap">{msg.content}</span>
-              ) : (
-                <div className="space-y-2 [&>ul]:list-disc [&>ul]:pl-5 [&>ol]:list-decimal [&>ol]:pl-5 [&>strong]:font-bold [&>p]:mb-1 [&>p]:whitespace-pre-wrap">
-                  <ReactMarkdown>{msg.content}</ReactMarkdown>
-                </div>
-              )}
+        {messages.map((msg, idx) => (
+          <div key={msg.id} className={`flex flex-col ${msg.role !== "bot" ? "items-end" : "items-start"}`}>
+            <div className={`flex ${msg.role !== "bot" ? "justify-end" : "justify-start"} w-full`}>
+              <div
+                className={`max-w-[85%] md:max-w-[75%] p-4 rounded-xl shadow-sm ${
+                  msg.role !== "bot"
+                    ? "bg-red-600 text-white rounded-br-none"
+                    : "bg-white border border-gray-200 text-gray-800 rounded-bl-none"
+                }`}
+              >
+                {msg.role !== "bot" ? (
+                  <span className="whitespace-pre-wrap">{msg.content}</span>
+                ) : (
+                  <div className="space-y-2 [&>ul]:list-disc [&>ul]:pl-5 [&>ol]:list-decimal [&>ol]:pl-5 [&>strong]:font-bold [&>p]:mb-1 [&>p]:whitespace-pre-wrap">
+                    <ReactMarkdown>{msg.content}</ReactMarkdown>
+                  </div>
+                )}
+              </div>
             </div>
+
+            {/* Tombol Buat Tiket — hanya di pesan bot terakhir saat suggest_ticket = true */}
+            {msg.role === "bot" && idx === messages.length - 1 && suggestTicket && (
+              <button
+                onClick={() => router.push("/dashboard/tiket")}
+                className="mt-2 flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition shadow-sm"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                Buat Tiket
+              </button>
+            )}
           </div>
         ))}
         {isLoading && (
