@@ -31,7 +31,9 @@ export async function GET() {
          AS unread_count
        FROM tickets t
        LEFT JOIN layanan_master lm ON lm.id = t.layanan_id
-       ORDER BY COALESCE(t.updated_at, t.created_at) DESC`
+       WHERE t.handled_by IS NULL OR t.handled_by = $1
+       ORDER BY COALESCE(t.updated_at, t.created_at) DESC`,
+      [session.nama]
     );
     return NextResponse.json(result.rows);
   } catch {
@@ -42,7 +44,9 @@ export async function GET() {
                 CASE WHEN LOWER(t.status) = 'open' THEN 1 ELSE 0 END AS unread_count
          FROM tickets t
          LEFT JOIN layanan_master lm ON lm.id = t.layanan_id
-         ORDER BY t.created_at DESC`
+         WHERE t.handled_by IS NULL OR t.handled_by = $1
+         ORDER BY t.created_at DESC`,
+        [session.nama]
       );
       return NextResponse.json(result.rows);
     } catch (err) {

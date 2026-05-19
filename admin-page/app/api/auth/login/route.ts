@@ -9,23 +9,22 @@ export async function POST(request: Request) {
 
     if (!identifier || !password) {
       return NextResponse.json(
-        { error: "NIP/Email dan password wajib diisi" },
+        { error: "NIP dan password wajib diisi" },
         { status: 400 }
       );
     }
 
-    // Cari admin berdasarkan nim_nip (NIP) atau email
     const result = await pool.query(
-      `SELECT id, nama, nim_nip, email, password, role
-       FROM users
-       WHERE role = 'admin' AND (nim_nip = $1 OR email = $1)
+      `SELECT id, nama, nip AS nim_nip, password, 'admin' AS role
+       FROM user_admin
+       WHERE nip = $1
        LIMIT 1`,
       [identifier.trim()]
     );
 
     if (result.rowCount === 0) {
       return NextResponse.json(
-        { error: "NIP/Email atau password salah" },
+        { error: "NIP atau password salah" },
         { status: 401 }
       );
     }
@@ -35,7 +34,7 @@ export async function POST(request: Request) {
 
     if (!valid) {
       return NextResponse.json(
-        { error: "NIP/Email atau password salah" },
+        { error: "NIP atau password salah" },
         { status: 401 }
       );
     }
@@ -44,13 +43,12 @@ export async function POST(request: Request) {
       id: admin.id,
       nama: admin.nama,
       nim_nip: admin.nim_nip,
-      email: admin.email,
       role: admin.role,
     });
 
     const response = NextResponse.json({
       success: true,
-      admin: { id: admin.id, nama: admin.nama, nim_nip: admin.nim_nip, email: admin.email },
+      admin: { id: admin.id, nama: admin.nama, nim_nip: admin.nim_nip },
     });
 
     response.cookies.set(cookieName(), token, cookieOptions());

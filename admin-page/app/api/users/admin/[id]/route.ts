@@ -9,26 +9,27 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 
   try {
     const { id } = await params;
-    const { nama, nip, email, prodi, reset_password } = await request.json();
+    const { nama, nip, reset_password } = await request.json();
     if (!nama || !nip) {
       return NextResponse.json({ error: "Nama dan NIP wajib diisi" }, { status: 400 });
     }
 
-    let query: string;
-    let values: unknown[];
-
+    let result;
     if (reset_password) {
       const password = await bcrypt.hash(nip, 10);
-      query = `UPDATE user_admin SET nama=$1, nip=$2, email=$3, prodi=$4, password=$5
-               WHERE id=$6 RETURNING id, nama, nip, email, prodi`;
-      values = [nama, nip, email, prodi, password, id];
+      result = await pool.query(
+        `UPDATE user_admin SET nama=$1, nip=$2, password=$3, updated_at=NOW()
+         WHERE id=$4 RETURNING id, nama, nip AS nim_nip`,
+        [nama, nip, password, id]
+      );
     } else {
-      query = `UPDATE user_admin SET nama=$1, nip=$2, email=$3, prodi=$4
-               WHERE id=$5 RETURNING id, nama, nip, email, prodi`;
-      values = [nama, nip, email, prodi, id];
+      result = await pool.query(
+        `UPDATE user_admin SET nama=$1, nip=$2, updated_at=NOW()
+         WHERE id=$3 RETURNING id, nama, nip AS nim_nip`,
+        [nama, nip, id]
+      );
     }
 
-    const result = await pool.query(query, values);
     if (result.rowCount === 0) return NextResponse.json({ error: "Data tidak ditemukan" }, { status: 404 });
     return NextResponse.json(result.rows[0]);
   } catch (err) {

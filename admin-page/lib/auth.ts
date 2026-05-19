@@ -12,7 +12,6 @@ export type AdminPayload = {
   id: number;
   nama: string;
   nim_nip: string;
-  email: string | null;
   role: string;
 };
 

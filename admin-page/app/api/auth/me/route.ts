@@ -10,7 +10,6 @@ export async function GET() {
     id: session.id,
     nama: session.nama,
     nim_nip: session.nim_nip,
-    email: session.email,
     role: session.role,
   });
 }

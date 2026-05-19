@@ -16,7 +16,7 @@ export default function LoginForm() {
     setError("");
 
     if (!identifier || !password) {
-      setError("NIP/Email dan password wajib diisi.");
+      setError("NIP dan password wajib diisi.");
       return;
     }
 
@@ -69,7 +69,7 @@ export default function LoginForm() {
           <form onSubmit={handleSubmit} className="w-full flex flex-col gap-3">
             <input
               type="text"
-              placeholder="NIP atau Email"
+              placeholder="NIP"
               value={identifier}
               onChange={(e) => setIdentifier(e.target.value)}
               autoComplete="username"

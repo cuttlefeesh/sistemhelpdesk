@@ -8,8 +8,7 @@ export async function POST(request: Request) {
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   try {
-    const rows: { nama: string; nip: string; email?: string; prodi?: string }[] =
-      await request.json();
+    const rows: { nama: string; nip: string }[] = await request.json();
 
     if (!Array.isArray(rows) || rows.length === 0) {
       return NextResponse.json({ error: "Data kosong" }, { status: 400 });
@@ -24,10 +23,10 @@ export async function POST(request: Request) {
       try {
         const password = await bcrypt.hash(row.nip.trim(), 10);
         await pool.query(
-          `INSERT INTO user_admin (nama, nip, email, password, prodi)
-           VALUES ($1,$2,$3,$4,$5)
+          `INSERT INTO user_admin (nama, nip, password)
+           VALUES ($1, $2, $3)
            ON CONFLICT (nip) DO NOTHING`,
-          [row.nama.trim(), row.nip.trim(), row.email || null, password, row.prodi || null]
+          [row.nama.trim(), row.nip.trim(), password]
         );
         inserted++;
       } catch (err) {

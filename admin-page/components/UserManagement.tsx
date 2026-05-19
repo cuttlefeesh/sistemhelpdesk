@@ -15,7 +15,7 @@ const TABS: { key: UserRole; label: string }[] = [
 const CSV_HEADERS: Record<UserRole, string[]> = {
   mahasiswa: ["NIM (Nomor Induk Mahasiswa)", "Nama", "Kelas"],  // format export iGracias
   dosen:     ["nip", "nama pegawai", "fakultas/unit", "prodi/lokasi kerja", "kode dosen", "nidn_nuptk"],
-  admin:     ["nama", "nip", "email", "prodi"],
+  admin:     ["nama", "nip"],
 };
 
 function parseCSV(text: string): Record<string, string>[] {
@@ -75,9 +75,13 @@ export default function UserManagement() {
     setLoading(true);
     setApiError(null);
     try {
-      const res = await fetch(`/api/users?role=${tab}`);
+      const url = tab === "admin" ? "/api/users/admin" : `/api/users?role=${tab}`;
+      const res = await fetch(url);
       if (!res.ok) throw new Error();
-      const data: UserEntry[] = await res.json();
+      const raw: (Omit<UserEntry, "role">)[] = await res.json();
+      const data: UserEntry[] = tab === "admin"
+        ? raw.map((u) => ({ ...u, role: "admin" as const }))
+        : raw as UserEntry[];
       setCache(cacheKey, data);
       setEntries(data);
     } catch {
@@ -178,11 +182,25 @@ export default function UserManagement() {
 
   const handleSave = async (data: UserFormData) => {
     try {
-      const url = editTarget ? `/api/users/${editTarget.id}` : "/api/users";
+      let url: string;
+      let body: Record<string, unknown>;
+
+      if (tab === "admin") {
+        url = editTarget ? `/api/users/admin/${editTarget.id}` : "/api/users/admin";
+        body = {
+          nama: data.nama,
+          nip: data.nim_nip,
+          reset_password: data.reset_password,
+        };
+      } else {
+        url = editTarget ? `/api/users/${editTarget.id}` : "/api/users";
+        body = { ...data, role: tab };
+      }
+
       const res = await fetch(url, {
         method: editTarget ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...data, role: tab }),
+        body: JSON.stringify(body),
       });
       if (!res.ok) {
         const json = await res.json().catch(() => ({}));
@@ -201,7 +219,10 @@ export default function UserManagement() {
   const handleDelete = async () => {
     if (!deleteTarget) return;
     try {
-      const res = await fetch(`/api/users/${deleteTarget.id}`, { method: "DELETE" });
+      const url = tab === "admin"
+        ? `/api/users/admin/${deleteTarget.id}`
+        : `/api/users/${deleteTarget.id}`;
+      const res = await fetch(url, { method: "DELETE" });
       if (!res.ok) throw new Error();
       setDeleteTarget(null);
       setSelected((prev) => { const next = new Set(prev); next.delete(deleteTarget.id); return next; });
@@ -215,17 +236,25 @@ export default function UserManagement() {
   const handleBulkDelete = async () => {
     const ids = [...selected].filter((id) => filtered.some((e) => e.id === id));
     try {
-      const res = await fetch("/api/users/bulk-delete", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ids }),
-      });
-      if (!res.ok) throw new Error();
-      const { deleted } = await res.json();
-      setBulkDeleteOpen(false);
-      setSelected(new Set());
-      refreshData();
-      showToast("success", `${deleted} user berhasil dihapus.`);
+      if (tab === "admin") {
+        await Promise.all(ids.map((id) => fetch(`/api/users/admin/${id}`, { method: "DELETE" })));
+        setBulkDeleteOpen(false);
+        setSelected(new Set());
+        refreshData();
+        showToast("success", `${ids.length} admin berhasil dihapus.`);
+      } else {
+        const res = await fetch("/api/users/bulk-delete", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ids }),
+        });
+        if (!res.ok) throw new Error();
+        const { deleted } = await res.json();
+        setBulkDeleteOpen(false);
+        setSelected(new Set());
+        refreshData();
+        showToast("success", `${deleted} user berhasil dihapus.`);
+      }
     } catch {
       showToast("error", "Gagal menghapus user. Coba lagi.");
     }
@@ -259,7 +288,7 @@ export default function UserManagement() {
 
   const idLabel = tab === "mahasiswa" ? "NIM" : "NIP";
   const tabLabel = TABS.find((t) => t.key === tab)!.label;
-  const colSpan = tab === "mahasiswa" ? 8 : tab === "dosen" ? 8 : 7;
+  const colSpan = tab === "mahasiswa" ? 8 : tab === "dosen" ? 8 : 5;
 
   return (
     <div className="flex flex-col gap-4">
@@ -370,20 +399,22 @@ export default function UserManagement() {
 
               {filterOpen && (
                 <div className="absolute right-0 top-full mt-1.5 z-30 bg-white border border-gray-200 rounded-xl shadow-lg w-64 p-4 flex flex-col gap-4">
-                  {/* Prodi */}
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Program Studi</label>
-                    <select
-                      value={filterProdi}
-                      onChange={(e) => { setFilterProdi(e.target.value); setPage(1); }}
-                      className="border border-gray-200 rounded-lg px-3 py-1.5 text-xs text-gray-600 outline-none focus:ring-2 focus:ring-red-300 transition bg-white"
-                    >
-                      <option value="">Semua Prodi</option>
-                      {prodiOptions.map((p) => (
-                        <option key={p} value={p}>{p}</option>
-                      ))}
-                    </select>
-                  </div>
+                  {/* Prodi — hanya untuk mahasiswa dan dosen */}
+                  {tab !== "admin" && (
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Program Studi</label>
+                      <select
+                        value={filterProdi}
+                        onChange={(e) => { setFilterProdi(e.target.value); setPage(1); }}
+                        className="border border-gray-200 rounded-lg px-3 py-1.5 text-xs text-gray-600 outline-none focus:ring-2 focus:ring-red-300 transition bg-white"
+                      >
+                        <option value="">Semua Prodi</option>
+                        {prodiOptions.map((p) => (
+                          <option key={p} value={p}>{p}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
 
                   {/* Kelas — hanya untuk tab Mahasiswa */}
                   {tab === "mahasiswa" && (
@@ -466,8 +497,8 @@ export default function UserManagement() {
                 <th className="th-cell">{idLabel}</th>
                 {tab === "dosen" && <th className="th-cell">Kode</th>}
                 {tab === "dosen" && <th className="th-cell">NIDN/NUPTK</th>}
-                <th className="th-cell">Email</th>
-                <th className="th-cell">Program Studi</th>
+                {tab !== "admin" && <th className="th-cell">Email</th>}
+                {tab !== "admin" && <th className="th-cell">Program Studi</th>}
                 {tab === "mahasiswa" && <th className="th-cell">Kelas</th>}
                 <th className="th-cell text-center">Aksi</th>
               </tr>
@@ -482,8 +513,8 @@ export default function UserManagement() {
                     <td className="px-4 py-4"><div className="w-24 h-4 bg-gray-100 rounded font-mono" /></td>
                     {tab === "dosen" && <td className="px-4 py-4"><div className="w-16 h-4 bg-gray-100 rounded" /></td>}
                     {tab === "dosen" && <td className="px-4 py-4"><div className="w-20 h-4 bg-gray-100 rounded" /></td>}
-                    <td className="px-4 py-4"><div className="w-40 h-4 bg-gray-100 rounded" /></td>
-                    <td className="px-4 py-4"><div className="w-24 h-6 bg-gray-100 rounded-full" /></td>
+                    {tab !== "admin" && <td className="px-4 py-4"><div className="w-40 h-4 bg-gray-100 rounded" /></td>}
+                    {tab !== "admin" && <td className="px-4 py-4"><div className="w-24 h-6 bg-gray-100 rounded-full" /></td>}
                     {tab === "mahasiswa" && <td className="px-4 py-4"><div className="w-16 h-4 bg-gray-100 rounded" /></td>}
                     <td className="px-4 py-4">
                       <div className="flex justify-center gap-2">
@@ -510,12 +541,14 @@ export default function UserManagement() {
                     <td className="px-4 py-4 text-gray-600 font-mono text-xs">{entry.nim_nip || "—"}</td>
                     {tab === "dosen" && <td className="px-4 py-4 text-gray-600">{entry.kode_dosen || "—"}</td>}
                     {tab === "dosen" && <td className="px-4 py-4 text-gray-600">{entry.nidn_nuptk || "—"}</td>}
-                    <td className="px-4 py-4 text-gray-600">{entry.email || "—"}</td>
-                    <td className="px-4 py-4">
-                      {entry.prodi
-                        ? <span className={`${prodiColor(entry.prodi)} text-xs font-medium px-2.5 py-1 rounded-full`}>{entry.prodi}</span>
-                        : <span className="text-gray-400">—</span>}
-                    </td>
+                    {tab !== "admin" && <td className="px-4 py-4 text-gray-600">{entry.email || "—"}</td>}
+                    {tab !== "admin" && (
+                      <td className="px-4 py-4">
+                        {entry.prodi
+                          ? <span className={`${prodiColor(entry.prodi)} text-xs font-medium px-2.5 py-1 rounded-full`}>{entry.prodi}</span>
+                          : <span className="text-gray-400">—</span>}
+                      </td>
+                    )}
                     {tab === "mahasiswa" && <td className="px-4 py-4 text-gray-600">{entry.kelas || "—"}</td>}
                     <td className="px-4 py-4">
                       <div className="flex items-center justify-center gap-2">

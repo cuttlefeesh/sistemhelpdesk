@@ -9,7 +9,7 @@ export async function GET() {
 
   try {
     const result = await pool.query(
-      `SELECT id, nama, nip, email, prodi FROM user_admin ORDER BY nama ASC`
+      `SELECT id, nama, nip AS nim_nip FROM user_admin ORDER BY nama ASC`
     );
     return NextResponse.json(result.rows);
   } catch (err) {
@@ -23,15 +23,16 @@ export async function POST(request: Request) {
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   try {
-    const { nama, nip, email, prodi } = await request.json();
+    const { nama, nip } = await request.json();
     if (!nama || !nip) {
       return NextResponse.json({ error: "Nama dan NIP wajib diisi" }, { status: 400 });
     }
     const password = await bcrypt.hash(nip, 10);
     const result = await pool.query(
-      `INSERT INTO user_admin (nama, nip, email, password, prodi)
-       VALUES ($1, $2, $3, $4, $5) RETURNING id, nama, nip, email, prodi`,
-      [nama, nip, email, password, prodi]
+      `INSERT INTO user_admin (nama, nip, password)
+       VALUES ($1, $2, $3)
+       RETURNING id, nama, nip AS nim_nip`,
+      [nama, nip, password]
     );
     return NextResponse.json(result.rows[0], { status: 201 });
   } catch (err) {

@@ -117,23 +117,27 @@ export default function UserModal({ role, entry, onClose, onSave }: Props) {
               </div>
             )}
 
-            {/* Email */}
-            <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium text-gray-700">Email</label>
-              <input type="email" value={form.email ?? ""} onChange={(e) => set("email", e.target.value)}
-                placeholder="Masukkan email..."
-                className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 placeholder-gray-400 outline-none focus:ring-2 focus:ring-red-300 transition" />
-            </div>
+            {/* Email — hanya mahasiswa dan dosen */}
+            {role !== "admin" && (
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-medium text-gray-700">Email</label>
+                <input type="email" value={form.email ?? ""} onChange={(e) => set("email", e.target.value)}
+                  placeholder="Masukkan email..."
+                  className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 placeholder-gray-400 outline-none focus:ring-2 focus:ring-red-300 transition" />
+              </div>
+            )}
 
-            {/* Prodi */}
-            <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium text-gray-700">Program Studi</label>
-              <select value={form.prodi ?? ""} onChange={(e) => set("prodi", e.target.value)}
-                className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 outline-none focus:ring-2 focus:ring-red-300 transition bg-white">
-                <option value="">-- Pilih Program Studi --</option>
-                {PRODI_OPTIONS.map((p) => <option key={p} value={p}>{p}</option>)}
-              </select>
-            </div>
+            {/* Prodi — hanya mahasiswa dan dosen */}
+            {role !== "admin" && (
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-medium text-gray-700">Program Studi</label>
+                <select value={form.prodi ?? ""} onChange={(e) => set("prodi", e.target.value)}
+                  className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 outline-none focus:ring-2 focus:ring-red-300 transition bg-white">
+                  <option value="">-- Pilih Program Studi --</option>
+                  {PRODI_OPTIONS.map((p) => <option key={p} value={p}>{p}</option>)}
+                </select>
+              </div>
+            )}
 
             {/* Mahasiswa: Kelas */}
             {role === "mahasiswa" && (
