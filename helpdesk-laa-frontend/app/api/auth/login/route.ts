@@ -21,7 +21,7 @@ export async function POST(request: Request) {
 
   try {
     const result = await pool.query(
-      "SELECT id, nim_nip, nama, email, password, prodi, kelas, kode_dosen FROM users WHERE nim_nip = $1",
+      "SELECT id, nim_nip, nama, email, password, prodi, kelas, kode_dosen FROM users WHERE nim_nip = $1 AND role != 'admin'",
       [nimNip],
     );
 

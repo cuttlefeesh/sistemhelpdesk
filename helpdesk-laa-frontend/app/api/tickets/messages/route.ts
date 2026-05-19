@@ -81,9 +81,9 @@ export async function POST(request: Request) {
 
     const result = await pool.query(
       `INSERT INTO ticket_messages
-      (ticket_id, sender_type, sender_id, sender_name, message, is_read, created_at)
-      VALUES ($1, 'user', $2, $3, $4, false, NOW()) RETURNING *`,
-      [ticket_id, session.nim_nip, session.nama, message],
+      (ticket_id, sender_type, sender_name, message, is_read, created_at)
+      VALUES ($1, 'user', $2, $3, false, NOW()) RETURNING *`,
+      [ticket_id, session.nama, message],
     );
 
     return NextResponse.json({ status: "success", data: result.rows[0] });

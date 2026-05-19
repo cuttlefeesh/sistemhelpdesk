@@ -3,6 +3,8 @@
 import { useState, useEffect } from "react";
 import { useUser } from "@/lib/UserContext";
 import type { Ticket } from "@/lib/types";
+import { useToast } from "@/lib/useToast";
+import ToastNotification from "@/components/ToastNotification";
 
 type TicketMessage = {
   id: number;
@@ -29,6 +31,7 @@ function saveViewedAt(map: Record<string, string>) {
 
 export default function TiketPage() {
   const { userRole } = useUser();
+  const { toast, showToast, dismissToast } = useToast();
 
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [searchTicket, setSearchTicket] = useState("");
@@ -111,7 +114,7 @@ export default function TiketPage() {
 
   const handleSubmitTicket = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedService) { alert("Silakan pilih jenis layanan terlebih dahulu!"); return; }
+    if (!selectedService) { showToast("error", "Silakan pilih jenis layanan terlebih dahulu!"); return; }
     setIsSubmittingTicket(true);
     try {
       const res = await fetch("/api/tickets", {
@@ -126,7 +129,7 @@ export default function TiketPage() {
         }),
       });
       if (res.ok) {
-        alert("Tiket berhasil dibuat!");
+        showToast("success", "Tiket berhasil dibuat!");
         setIsTicketModalOpen(false);
         setSelectedService("");
         setNewTicketSubject("");
@@ -168,7 +171,7 @@ export default function TiketPage() {
         setTicketMessages((prev) => [...prev, result.data]);
         setReplyInput("");
       }
-    } catch { alert("Gagal mengirim pesan."); }
+    } catch { showToast("error", "Gagal mengirim pesan."); }
     finally { setIsSendingReply(false); }
   };
 
@@ -449,6 +452,8 @@ export default function TiketPage() {
           </div>
         </div>
       )}
+
+      <ToastNotification toast={toast} onDismiss={dismissToast} />
     </div>
   );
 }

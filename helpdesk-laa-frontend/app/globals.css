@@ -4,3 +4,13 @@ body {
   background-color: #f9fafb; /* Latar belakang abu-abu sangat terang */
   color: #171717; /* Warna teks utama gelap */
 }
+
+/* Sembunyikan native password toggle dari browser (Edge, Chrome, IE) */
+input[type="password"]::-ms-reveal,
+input[type="password"]::-ms-clear {
+  display: none;
+}
+input::-webkit-credentials-auto-fill-button {
+  visibility: hidden;
+  pointer-events: none;
+}

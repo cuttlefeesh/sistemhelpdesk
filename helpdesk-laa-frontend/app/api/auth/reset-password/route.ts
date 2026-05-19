@@ -27,7 +27,7 @@ export async function POST(request: Request) {
         {
           status: "error",
           message:
-            "Akun Anda belum memiliki email terdaftar. Silakan hubungi admin LAA FTE.",
+            "Anda belum memiliki email terdaftar. Silakan gunakan NIM/NIP sebagai username dan password untuk login",
         },
         { status: 400 },
       );
@@ -52,7 +52,8 @@ export async function POST(request: Request) {
       },
     });
 
-    const resetUrl = `${process.env.NEXT_PUBLIC_BASE_URL}/?token=${token}`;
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL ?? "http://localhost:3000";
+    const resetUrl = `${baseUrl}/?token=${token}`;
 
     await transporter.sendMail({
       from: '"Helpdesk LAA FTE" <no-reply@telkomuniversity.ac.id>',

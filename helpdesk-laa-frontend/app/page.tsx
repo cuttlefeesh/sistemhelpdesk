@@ -3,6 +3,8 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import anime from "animejs";
+import { useToast } from "@/lib/useToast";
+import ToastNotification from "@/components/ToastNotification";
 
 function RobotMascot({ isFocused }: { isFocused: boolean }) {
   const leftPupilRef = useRef<SVGCircleElement>(null);
@@ -71,9 +73,11 @@ function RobotMascot({ isFocused }: { isFocused: boolean }) {
 
 export default function LoginPage() {
   const router = useRouter();
+  const { toast, showToast, dismissToast } = useToast();
 
   const [nimNip, setNimNip] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loginError, setLoginError] = useState("");
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [isInputFocused, setIsInputFocused] = useState(false);
@@ -81,10 +85,15 @@ export default function LoginPage() {
   const [isForgotModalOpen, setIsForgotModalOpen] = useState(false);
   const [forgotNimInput, setForgotNimInput] = useState("");
   const [isSendingReset, setIsSendingReset] = useState(false);
+  const [forgotMessage, setForgotMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   const [resetToken, setResetToken] = useState<string | null>(null);
   const [newPassword, setNewPassword] = useState("");
+  const [retypePassword, setRetypePassword] = useState("");
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showRetypePassword, setShowRetypePassword] = useState(false);
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
+  const [resetMessage, setResetMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   // Cek token reset password dari URL
   useEffect(() => {
@@ -147,18 +156,39 @@ export default function LoginPage() {
             </div>
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">Password</label>
-              <input
-                id="password"
-                type="password"
-                autoComplete="off"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                onFocus={() => setIsInputFocused(true)}
-                onBlur={() => setIsInputFocused(false)}
-                placeholder="Masukkan password..."
-                className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-red-500 transition"
-                required
-              />
+              <div className="relative">
+                <input
+                  id="password"
+                  type="text"
+                  autoComplete="off"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  onFocus={() => setIsInputFocused(true)}
+                  onBlur={() => setIsInputFocused(false)}
+                  placeholder="Masukkan password..."
+                  className="w-full border border-gray-300 rounded-lg px-4 py-3 pr-11 focus:outline-none focus:ring-2 focus:ring-red-500 transition"
+                  style={{ WebkitTextSecurity: showPassword ? "none" : "disc" } as React.CSSProperties}
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition"
+                  tabIndex={-1}
+                  aria-label={showPassword ? "Sembunyikan password" : "Tampilkan password"}
+                >
+                  {showPassword ? (
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" className="w-5 h-5">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                  ) : (
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" className="w-5 h-5">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88" />
+                    </svg>
+                  )}
+                </button>
+              </div>
             </div>
 
             {loginError && (
@@ -194,6 +224,14 @@ export default function LoginPage() {
             <form
               onSubmit={async (e) => {
                 e.preventDefault();
+                setResetMessage(null);
+
+                // Validasi kecocokan password
+                if (newPassword !== retypePassword) {
+                  setResetMessage({ type: "error", text: "Kedua password harus sama. Pastikan Anda mengetik password yang sama di kedua field." });
+                  return;
+                }
+
                 setIsUpdatingPassword(true);
                 try {
                   const res = await fetch("/api/auth/update-password", {
@@ -203,34 +241,111 @@ export default function LoginPage() {
                   });
                   const result = await res.json();
                   if (result.status === "success") {
-                    alert("Password berhasil diubah! Silakan login menggunakan password baru.");
-                    setResetToken(null);
+                    setResetMessage({ type: "success", text: "Password berhasil diubah! Silakan login menggunakan password baru." });
                     setNewPassword("");
+                    setRetypePassword("");
                     window.history.replaceState({}, document.title, "/");
+                    setTimeout(() => setResetToken(null), 2500);
                   } else {
-                    alert(result.message);
+                    setResetMessage({ type: "error", text: result.message });
                   }
-                } catch { alert("Gagal menghubungi server."); }
-                finally { setIsUpdatingPassword(false); }
+                } catch {
+                  setResetMessage({ type: "error", text: "Gagal menghubungi server." });
+                } finally { setIsUpdatingPassword(false); }
               }}
               className="space-y-4"
             >
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Password Baru</label>
-                <input
-                  type="password"
-                  required
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="Minimal 6 karakter"
-                  className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-red-500 outline-none transition"
-                  minLength={6}
-                />
+                <div className="relative">
+                  <input
+                    type="text"
+                    required
+                    value={newPassword}
+                    onChange={(e) => { setNewPassword(e.target.value); setResetMessage(null); }}
+                    placeholder="Minimal 6 karakter"
+                    className="w-full border border-gray-300 rounded-xl px-4 py-3 pr-11 focus:ring-2 focus:ring-red-500 outline-none transition"
+                    style={{ WebkitTextSecurity: showNewPassword ? "none" : "disc" } as React.CSSProperties}
+                    minLength={6}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPassword((v) => !v)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition"
+                    tabIndex={-1}
+                    aria-label={showNewPassword ? "Sembunyikan password" : "Tampilkan password"}
+                  >
+                    {showNewPassword ? (
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" className="w-5 h-5">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                    ) : (
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" className="w-5 h-5">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
               </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Ulangi Password Baru</label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    required
+                    value={retypePassword}
+                    onChange={(e) => { setRetypePassword(e.target.value); setResetMessage(null); }}
+                    placeholder="Ketik ulang password baru"
+                    className="w-full border border-gray-300 rounded-xl px-4 py-3 pr-11 focus:ring-2 focus:ring-red-500 outline-none transition"
+                    style={{ WebkitTextSecurity: showRetypePassword ? "none" : "disc" } as React.CSSProperties}
+                    minLength={6}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowRetypePassword((v) => !v)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition"
+                    tabIndex={-1}
+                    aria-label={showRetypePassword ? "Sembunyikan password" : "Tampilkan password"}
+                  >
+                    {showRetypePassword ? (
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" className="w-5 h-5">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                    ) : (
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" className="w-5 h-5">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Pesan sukses / error — inline */}
+              {resetMessage && (
+                <div className={`flex items-start gap-2.5 px-4 py-3 rounded-xl text-sm font-medium border ${
+                  resetMessage.type === "success"
+                    ? "bg-green-50 border-green-200 text-green-700"
+                    : "bg-red-50 border-red-200 text-red-700"
+                }`}>
+                  {resetMessage.type === "success" ? (
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                  ) : (
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4m0 4h.01M21 12A9 9 0 113 12a9 9 0 0118 0z" />
+                    </svg>
+                  )}
+                  <span>{resetMessage.text}</span>
+                </div>
+              )}
+
               <button
                 type="submit"
                 disabled={isUpdatingPassword}
-                className="w-full py-3 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 disabled:opacity-50 transition shadow-md mt-2"
+                className="w-full py-3 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 disabled:opacity-50 transition shadow-md"
               >
                 {isUpdatingPassword ? "Menyimpan..." : "Simpan Password Baru"}
               </button>
@@ -252,12 +367,12 @@ export default function LoginPage() {
                 type="text"
                 placeholder="Masukkan NIM atau NIP..."
                 value={forgotNimInput}
-                onChange={(e) => setForgotNimInput(e.target.value)}
+                onChange={(e) => { setForgotNimInput(e.target.value); setForgotMessage(null); }}
                 className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-red-500 outline-none transition"
               />
               <div className="flex gap-2">
                 <button
-                  onClick={() => setIsForgotModalOpen(false)}
+                  onClick={() => { setIsForgotModalOpen(false); setForgotNimInput(""); setForgotMessage(null); }}
                   className="flex-1 py-3 bg-gray-100 text-gray-600 rounded-xl font-bold hover:bg-gray-200 transition"
                 >
                   Batal
@@ -265,6 +380,7 @@ export default function LoginPage() {
                 <button
                   disabled={isSendingReset || !forgotNimInput}
                   onClick={async () => {
+                    setForgotMessage(null);
                     setIsSendingReset(true);
                     try {
                       const res = await fetch("/api/auth/reset-password", {
@@ -274,24 +390,46 @@ export default function LoginPage() {
                       });
                       const result = await res.json();
                       if (result.status === "success") {
-                        alert("Link reset password telah dikirim ke email Anda. Silakan cek Inbox/Spam.");
-                        setIsForgotModalOpen(false);
+                        setForgotMessage({ type: "success", text: "Link reset password telah dikirim ke email Anda. Silakan cek Inbox/Spam." });
                         setForgotNimInput("");
                       } else {
-                        alert(result.message);
+                        setForgotMessage({ type: "error", text: result.message });
                       }
-                    } catch { alert("Gagal menghubungi server."); }
-                    finally { setIsSendingReset(false); }
+                    } catch {
+                      setForgotMessage({ type: "error", text: "Gagal menghubungi server." });
+                    } finally { setIsSendingReset(false); }
                   }}
                   className="flex-[2] py-3 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 disabled:opacity-50 transition"
                 >
                   {isSendingReset ? "Mengirim..." : "Kirim Link"}
                 </button>
               </div>
+
+              {/* Pesan sukses / error — inline di dalam modal */}
+              {forgotMessage && (
+                <div className={`flex items-start gap-2.5 px-4 py-3 rounded-xl text-sm font-medium border ${
+                  forgotMessage.type === "success"
+                    ? "bg-green-50 border-green-200 text-green-700"
+                    : "bg-red-50 border-red-200 text-red-700"
+                }`}>
+                  {forgotMessage.type === "success" ? (
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                  ) : (
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4m0 4h.01M21 12A9 9 0 113 12a9 9 0 0118 0z" />
+                    </svg>
+                  )}
+                  <span>{forgotMessage.text}</span>
+                </div>
+              )}
             </div>
           </div>
         </div>
       )}
+
+      <ToastNotification toast={toast} onDismiss={dismissToast} />
     </>
   );
 }

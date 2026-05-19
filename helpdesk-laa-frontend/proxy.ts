@@ -54,7 +54,8 @@ export async function proxy(request: NextRequest) {
   }
 
   // ── Jika sudah login dan akses / → redirect ke /dashboard/chat ──
-  if (pathname === "/") {
+  // Pengecualian: jika ada ?token= di URL (link reset password), jangan redirect
+  if (pathname === "/" && !request.nextUrl.searchParams.has("token")) {
     const token = request.cookies.get(cookieName())?.value;
     if (token) {
       const session = await verifyToken(token);

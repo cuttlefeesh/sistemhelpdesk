@@ -3,15 +3,18 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useUser } from "@/lib/UserContext";
+import { useToast } from "@/lib/useToast";
+import ToastNotification from "@/components/ToastNotification";
 
 export default function AkunPage() {
   const router = useRouter();
   const { nimNip, userName, userRole, userEmail, prodi, kelas, kodeDosen, setUserEmail } = useUser();
 
+  const { toast, showToast, dismissToast } = useToast();
+
   const [isEditingEmail, setIsEditingEmail] = useState(false);
   const [newEmailInput, setNewEmailInput] = useState("");
   const [isUpdatingEmail, setIsUpdatingEmail] = useState(false);
-  const [passwordStatus, setPasswordStatus] = useState("");
 
   const isMahasiswa = userRole?.toLowerCase() === "mahasiswa";
   const isDosen = userRole?.toLowerCase() === "dosen";
@@ -107,7 +110,10 @@ export default function AkunPage() {
                   />
                   <button
                     onClick={async () => {
-                      if (!newEmailInput.includes("@")) return alert("Format email tidak valid");
+                      if (!newEmailInput.includes("@")) {
+                        showToast("error", "Format email tidak valid");
+                        return;
+                      }
                       setIsUpdatingEmail(true);
                       try {
                         const res = await fetch("/api/auth/update-email", {
@@ -119,11 +125,11 @@ export default function AkunPage() {
                         if (result.status === "success") {
                           setUserEmail(newEmailInput);
                           setIsEditingEmail(false);
-                          alert("Email berhasil tersimpan permanen!");
+                          showToast("success", "Email berhasil disimpan");
                         } else {
-                          alert(result.message);
+                          showToast("error", result.message);
                         }
-                      } catch { alert("Gagal terhubung ke server untuk update email."); }
+                      } catch { showToast("error", "Gagal terhubung ke server untuk update email."); }
                       finally { setIsUpdatingEmail(false); }
                     }}
                     className="bg-green-600 text-white px-3 py-1.5 rounded-lg text-sm font-bold disabled:opacity-50 shrink-0"
@@ -151,7 +157,7 @@ export default function AkunPage() {
               <button
                 disabled={!userEmail}
                 onClick={async () => {
-                  setPasswordStatus("Sedang memproses permintaan...");
+                  showToast("success", "Sedang mengirim link reset password...");
                   try {
                     const res = await fetch("/api/auth/reset-password", {
                       method: "POST",
@@ -160,12 +166,12 @@ export default function AkunPage() {
                     });
                     const result = await res.json();
                     if (result.status === "success") {
-                      setPasswordStatus(`Link konfirmasi telah dikirim ke ${userEmail}. Silakan cek kotak masuk Anda.`);
+                      showToast("success", `Link konfirmasi telah dikirim ke ${userEmail}. Silakan cek kotak masuk Anda.`);
                     } else {
-                      setPasswordStatus("Gagal mengirim email. Pastikan data profil benar.");
+                      showToast("error", "Gagal mengirim email. Pastikan data profil benar.");
                     }
                   } catch {
-                    setPasswordStatus("Terjadi kesalahan jaringan/teknis saat mengirim email.");
+                    showToast("error", "Terjadi kesalahan jaringan/teknis saat mengirim email.");
                   }
                 }}
                 className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl font-bold transition shadow-sm text-sm ${
@@ -182,9 +188,6 @@ export default function AkunPage() {
                   *Lengkapi email terlebih dahulu untuk mengaktifkan fitur ubah password
                 </p>
               )}
-              {passwordStatus && (
-                <p className="text-xs text-center text-green-600 font-medium mt-2 bg-green-50 p-2 rounded-lg">{passwordStatus}</p>
-              )}
             </div>
           </div>
 
@@ -199,6 +202,9 @@ export default function AkunPage() {
           </div>
         </div>
       </div>
+
+      <ToastNotification toast={toast} onDismiss={dismissToast} />
     </div>
   );
 }
+
