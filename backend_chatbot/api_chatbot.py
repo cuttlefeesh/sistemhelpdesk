@@ -10,7 +10,7 @@ from slowapi.errors import RateLimitExceeded
 from pydantic import BaseModel
 import psycopg2
 import ollama
-ollama_client = ollama.Client(host="http://127.0.0.1:11434")
+ollama_client = ollama.Client(host=os.getenv("OLLAMA_URL", "http://127.0.0.1:11434"))
 import torch
 import json
 import re

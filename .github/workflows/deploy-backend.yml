@@ -1,0 +1,32 @@
+name: Deploy Backend ke Hostinger
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend_chatbot/**'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: SSH ke VPS & Pull + Restart
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            cd /opt/helpdesk-backend
+            BEFORE=$(git rev-parse HEAD)
+            git pull origin main
+            AFTER=$(git rev-parse HEAD)
+            if git diff $BEFORE $AFTER --name-only | grep -q "requirements.txt"; then
+              echo "requirements.txt berubah, menjalankan pip install..."
+              source venv/bin/activate
+              pip install -r requirements.txt
+            else
+              echo "requirements.txt tidak berubah, skip pip install."
+            fi
+            chown -R chatbot:chatbot /opt/helpdesk-backend
+            systemctl restart helpdesk-api
