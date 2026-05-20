@@ -330,3 +330,4 @@ KONTEKS DATABASE:
         raise HTTPException(status_code=500, detail="Terjadi kesalahan server. Silakan coba lagi.")
 
 # Jalankan server menggunakan command: uvicorn api_chatbot:app --host 0.0.0.0 --port 8000
+# test
