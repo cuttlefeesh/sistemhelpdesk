@@ -240,8 +240,12 @@ async def process_chat(req: ChatRequest, request: Request):
     safe_role = req.user_mode.lower() if req.user_mode.lower() in _VALID_ROLES else "mahasiswa"
 
     sql_users_filter = " AND role = 'dosen'" if safe_role == "mahasiswa" else ""
-    # Filter: Ambil layanan sesuai role user saat ini, ATAU yang untuk umum ('all')
-    sql_kb_filter = f" AND (LOWER(tipe_pengguna) = '{safe_role}' OR LOWER(tipe_pengguna) = 'all')"
+    # Mahasiswa: layanan mahasiswa (LAA + Referral) + semua entri Referral
+    # Dosen: semua layanan (mahasiswa + dosen, LAA + Referral)
+    if safe_role == "mahasiswa":
+        sql_kb_filter = " AND (LOWER(tipe_pengguna) = 'mahasiswa' OR LOWER(tipe_layanan) = 'referral')"
+    else:  # dosen
+        sql_kb_filter = " AND LOWER(tipe_pengguna) IN ('mahasiswa', 'dosen')"
 
     if intent == "prosedur" or (is_prosedur and not is_user_query):
         context = fetch_dynamic_context(clean_query, query_embed, "knowledge_base", top_k=4, extra_filter=sql_kb_filter)
