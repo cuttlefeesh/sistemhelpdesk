@@ -216,13 +216,9 @@ async def process_chat(req: ChatRequest, request: Request):
     
     # 2. Ambil konteks & embedding
     user_msgs = [m.content for m in req.history if m.role == "user"]
-    _FOLLOWUP_WORDS = ["nya", "nya?", "kalau", "dia", "beliau"]
-    _DISSATISFACTION_WORDS = ["kurang", "gak", "ngga", "nggak", "tidak", "bingung",
-                              "jelas", "detail", "lengkap", "paham", "mengerti",
-                              "maksudnya", "jelasin", "maksud"]
+    _FOLLOWUP_WORDS = ["nya", "nya?", "kalau", "dia", "beliau", "kok", "bukan", "harusnya", "salah"]
     is_follow_up = (
         any(word in current_lower.split() for word in _FOLLOWUP_WORDS)
-        or any(word in current_lower.split() for word in _DISSATISFACTION_WORDS)
         or len(current_lower.split()) <= 3
     )
     search_query = f"{user_msgs[-1]} {safe_prompt}" if is_follow_up and user_msgs else safe_prompt
@@ -261,7 +257,7 @@ async def process_chat(req: ChatRequest, request: Request):
     # 4. Susun System Prompt
     base_security_prompt = generate_system_prompt(
         role=f"asisten chatbot resmi untuk Layanan Administrasi Akademik (LAA) FTE Telkom University yang sedang melayani seorang {req.user_mode}",
-        task="memberikan informasi HANYA berdasarkan KONTEKS yang disediakan"
+        task="memberikan informasi berdasarkan KONTEKS yang disediakan dan riwayat percakapan yang relevan"
     )
 
     full_system_instructions = f"""{base_security_prompt}
@@ -285,7 +281,7 @@ ATURAN PENTING UNTUK MENJAWAB:
 9. ESKALASI TIKET LAA:
    - HANYA jika pertanyaan JELAS berkaitan dengan layanan LAA (ada entri relevan di konteks dengan tipe_layanan='LAA') DAN informasi tidak tersedia atau membutuhkan penanganan langsung admin: tambahkan teks "[ESKALASI]" di AWAL jawaban (sebelum kalimat lainnya), lalu sarankan membuat tiket: "Untuk mendapatkan penanganan lebih lanjut, silakan buat tiket melalui menu **Tiket** di dashboard Anda."
    - JIKA pertanyaan di luar cakupan LAA/Referral (pertanyaan umum, teknologi, gaya hidup, dll): JANGAN sertakan "[ESKALASI]", cukup jawab bahwa pertanyaan tersebut di luar layanan LAA FTE.
-10. EKSPRESI KETIDAKPUASAN: Jika pengguna mengungkapkan ketidakpuasan, kebingungan, atau meminta klarifikasi lebih lanjut (misal: "kurang jelas", "gak ngerti", "bingung", "maksudnya apa") atas topik yang BERKAITAN dengan layanan LAA, dan informasi lebih detail tidak tersedia dalam konteks: gunakan aturan ESKALASI TIKET (Rule 9) — tambahkan [ESKALASI] dan arahkan ke tiket. JANGAN jawab "informasi tidak tersedia" untuk ekspresi frustrasi atas topik LAA.
+10. RIWAYAT PERCAKAPAN: Jika pesan pengguna adalah koreksi, klarifikasi, atau pertanyaan lanjutan yang merujuk langsung pada jawaban sebelumnya (contoh: "kok bapak", "bukan itu", "maksudnya yang tadi", "harusnya ibu"), GUNAKAN riwayat percakapan yang tersedia untuk menjawab dengan tepat. Jangan abaikan informasi yang sudah ada di riwayat chat hanya karena konteks database tidak mengandung data baru.
 
 KONTEKS DATABASE:
 {context}
