@@ -1,10 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useUser } from "@/lib/UserContext";
 import type { Ticket } from "@/lib/types";
 import { useToast } from "@/lib/useToast";
 import ToastNotification from "@/components/ToastNotification";
+import { getCache, setCache, invalidateCache } from "@/lib/dataCache";
+import Pagination from "@/components/Pagination";
 
 type TicketMessage = {
   id: number;
@@ -17,6 +19,44 @@ type TicketMessage = {
 };
 
 type Service = { id: number; nama_layanan: string };
+
+function parseAsUTC(val: string): Date {
+  if (!val) return new Date(NaN);
+  const hasTimezone = val.endsWith("Z") || /[+-]\d{2}:\d{2}$/.test(val);
+  if (hasTimezone) return new Date(val);
+  return new Date(val.replace(" ", "T") + "Z");
+}
+
+function localTime(val: string): string {
+  if (!val) return "";
+  const d = parseAsUTC(val);
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
+function localDateKey(val: string): string {
+  if (!val) return "";
+  const d = parseAsUTC(val);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function dateKeyOf(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function formatDateLabel(dateKey: string): string {
+  const [y, mo, dy] = dateKey.split("-").map(Number);
+  const msgDate = new Date(y, mo - 1, dy);
+  const now = new Date();
+  const today = dateKeyOf(now);
+  const yesterday = dateKeyOf(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1));
+  if (dateKey === today) return "Today";
+  if (dateKey === yesterday) return "Yesterday";
+  const diffDays = Math.floor(
+    (new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime() - msgDate.getTime()) / 86400000,
+  );
+  if (diffDays < 7) return msgDate.toLocaleDateString("en-US", { weekday: "long" });
+  return `${String(dy).padStart(2, "0")}/${String(mo).padStart(2, "0")}/${y}`;
+}
 
 const LS_KEY = "helpdesk_ticket_viewed";
 
@@ -33,7 +73,11 @@ export default function TiketPage() {
   const { userRole } = useUser();
   const { toast, showToast, dismissToast } = useToast();
 
-  const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [tickets, setTickets] = useState<Ticket[]>(() => getCache<Ticket>("tickets") ?? []);
+  const [loadingTickets, setLoadingTickets] = useState(() => !getCache<Ticket>("tickets"));
+  const [loadingMessages, setLoadingMessages] = useState(false);
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 25;
   const [searchTicket, setSearchTicket] = useState("");
   const [filterDate, setFilterDate] = useState("");
   const [filterStatus, setFilterStatus] = useState("All");
@@ -55,8 +99,12 @@ export default function TiketPage() {
   const [isSubmittingTicket, setIsSubmittingTicket] = useState(false);
   const [selectedService, setSelectedService] = useState("");
   const [services, setServices] = useState<Service[]>([]);
+  const replyTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   const fetchTickets = async () => {
+    const cached = getCache<Ticket>("tickets");
+    if (cached) { setTickets(cached); setLoadingTickets(false); return; }
+    setLoadingTickets(true);
     try {
       const res = await fetch("/api/tickets");
       const result = await res.json();
@@ -68,19 +116,28 @@ export default function TiketPage() {
             : new Date().toISOString().split("T")[0],
         }));
         setTickets(formatted);
+        setCache("tickets", formatted);
       } else {
         setTickets([]);
       }
     } catch {
       setTickets([]);
+    } finally {
+      setLoadingTickets(false);
     }
   };
 
   const fetchServices = async () => {
+    const key = `services_${userRole}`;
+    const cached = getCache<Service>(key);
+    if (cached) { setServices(cached); return; }
     try {
       const res = await fetch(`/api/services?role=${userRole}`);
       const result = await res.json();
-      if (result.status === "success") setServices(result.data);
+      if (result.status === "success") {
+        setServices(result.data);
+        setCache(key, result.data);
+      }
     } catch { /* noop */ }
   };
 
@@ -103,6 +160,8 @@ export default function TiketPage() {
     return new Date(updatedAt) > new Date(lastViewed);
   };
 
+  useEffect(() => { setPage(1); }, [searchTicket, filterDate, filterStatus]);
+
   const filteredTickets = tickets.filter((ticket) => {
     const matchSearch =
       ticket.subject.toLowerCase().includes(searchTicket.toLowerCase()) ||
@@ -111,6 +170,9 @@ export default function TiketPage() {
     const matchStatus = filterStatus === "All" ? true : ticket.status === filterStatus;
     return matchSearch && matchDate && matchStatus;
   });
+
+  const totalPages = Math.ceil(filteredTickets.length / PAGE_SIZE);
+  const paginatedTickets = filteredTickets.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const handleSubmitTicket = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -134,6 +196,7 @@ export default function TiketPage() {
         setSelectedService("");
         setNewTicketSubject("");
         setNewTicketDescription("");
+        invalidateCache("tickets");
         fetchTickets();
       }
     } catch { console.error("Gagal membuat tiket"); }
@@ -141,7 +204,6 @@ export default function TiketPage() {
   };
 
   const handleViewTicket = async (ticket: Ticket) => {
-    // Tandai tiket sebagai "sudah dibaca" sekarang
     const now = new Date().toISOString();
     const updated = { ...viewedAt, [ticket.id]: now };
     setViewedAt(updated);
@@ -149,11 +211,20 @@ export default function TiketPage() {
 
     setSelectedTicket(ticket);
     setTicketMessages([]);
+    setLoadingMessages(true);
+
+    const key = `ticket_messages_${ticket.id}`;
+    const cached = getCache<TicketMessage>(key);
+    if (cached) { setTicketMessages(cached); setLoadingMessages(false); return; }
     try {
       const res = await fetch(`/api/tickets/messages?ticketId=${ticket.id}`);
       const result = await res.json();
-      if (result.status === "success") setTicketMessages(result.data);
+      if (result.status === "success") {
+        setTicketMessages(result.data);
+        setCache(key, result.data);
+      }
     } catch { console.error("Gagal memuat pesan tiket"); }
+    finally { setLoadingMessages(false); }
   };
 
   const handleSendTicketReply = async (e: React.FormEvent) => {
@@ -168,8 +239,11 @@ export default function TiketPage() {
       });
       const result = await res.json();
       if (result.status === "success") {
-        setTicketMessages((prev) => [...prev, result.data]);
+        const updated = [...ticketMessages, result.data];
+        setTicketMessages(updated);
+        setCache(`ticket_messages_${selectedTicket.id}`, updated);
         setReplyInput("");
+        if (replyTextareaRef.current) replyTextareaRef.current.style.height = "auto";
       }
     } catch { showToast("error", "Gagal mengirim pesan."); }
     finally { setIsSendingReply(false); }
@@ -244,7 +318,7 @@ export default function TiketPage() {
 
           {/* Tabel */}
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto" id="tiket-table">
               <table className="w-full text-left border-collapse min-w-[600px]">
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-200 text-sm text-gray-500 uppercase tracking-wider">
@@ -259,8 +333,21 @@ export default function TiketPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200 text-sm">
-                  {filteredTickets.length > 0 ? (
-                    filteredTickets.map((ticket) => (
+                  {loadingTickets ? (
+                    Array.from({ length: 6 }).map((_, i) => (
+                      <tr key={i} className="animate-pulse border-b border-gray-50">
+                        <td className="px-6 py-4"><div className="h-4 bg-gray-100 rounded w-20" /></td>
+                        <td className="px-6 py-4"><div className="h-4 bg-gray-100 rounded w-24" /></td>
+                        <td className="px-6 py-4"><div className="h-4 bg-gray-100 rounded w-32" /></td>
+                        <td className="px-6 py-4"><div className="h-4 bg-gray-100 rounded w-20" /></td>
+                        <td className="px-6 py-4"><div className="h-4 bg-gray-100 rounded w-48" /></td>
+                        <td className="px-6 py-4"><div className="h-4 bg-gray-100 rounded w-24" /></td>
+                        <td className="px-6 py-4"><div className="h-6 bg-gray-100 rounded-full w-20" /></td>
+                        <td className="px-3 py-4" />
+                      </tr>
+                    ))
+                  ) : paginatedTickets.length > 0 ? (
+                    paginatedTickets.map((ticket) => (
                       <tr
                         key={ticket.id}
                         onClick={() => handleViewTicket(ticket)}
@@ -308,6 +395,13 @@ export default function TiketPage() {
                 </tbody>
               </table>
             </div>
+            <Pagination
+              page={page}
+              totalPages={totalPages}
+              totalItems={filteredTickets.length}
+              pageSize={PAGE_SIZE}
+              onChange={setPage}
+            />
           </div>
         </div>
       </div>
@@ -319,7 +413,7 @@ export default function TiketPage() {
             <h3 className="text-xl font-bold text-gray-800 mb-4">Buat Tiket Baru</h3>
             <form onSubmit={handleSubmitTicket} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Kategori Layanan</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Kategori Layanan <span className="text-red-500">*</span></label>
                 <select
                   required
                   value={selectedService}
@@ -333,7 +427,7 @@ export default function TiketPage() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Subjek / Judul</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Subjek / Judul <span className="text-red-500">*</span></label>
                 <input
                   type="text"
                   required
@@ -344,7 +438,7 @@ export default function TiketPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Deskripsi Masalah</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Deskripsi Masalah <span className="text-red-500">*</span></label>
                 <textarea
                   required
                   rows={4}
@@ -384,57 +478,127 @@ export default function TiketPage() {
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
-              {ticketMessages.length === 0 ? (
-                <p className="text-center text-gray-400 text-sm italic mt-10">Belum ada percakapan pada tiket ini.</p>
-              ) : (
-                ticketMessages.map((msg, idx) => (
-                  <div key={idx} className={`flex ${msg.sender_type === "user" ? "justify-end" : "justify-start"}`}>
-                    <div className={`max-w-[80%] rounded-xl p-3 shadow-sm ${
-                      msg.sender_type === "user"
-                        ? "bg-red-600 text-white rounded-br-none"
-                        : "bg-white border border-gray-200 text-gray-800 rounded-bl-none"
-                    }`}>
-                      <p className="text-xs opacity-75 mb-1 font-semibold">
-                        {msg.sender_name} {msg.sender_type === "admin" && "🛡️"}
-                      </p>
-                      <p className="text-sm">{msg.message}</p>
-                      <div className="flex items-center justify-end gap-1 mt-1 text-[10px] opacity-80">
-                        <p>{new Date(msg.created_at).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}</p>
-                        {msg.sender_type === "user" && (
-                          <span>
-                            {msg.is_read ? (
-                              <div className="flex -space-x-1.5 text-blue-300" title="Dibaca">
-                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor" className="w-3 h-3">
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-                                </svg>
-                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor" className="w-3 h-3">
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-                                </svg>
-                              </div>
-                            ) : (
-                              <span title="Terkirim">
-                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor" className="w-3 h-3 opacity-70">
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-                                </svg>
-                              </span>
-                            )}
-                          </span>
-                        )}
-                      </div>
+              {loadingMessages ? (
+                Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className={`flex ${i % 2 === 0 ? "justify-end" : "justify-start"} animate-pulse`}>
+                    <div className={`max-w-[70%] rounded-xl p-3 bg-gray-100 ${i % 2 === 0 ? "rounded-br-none" : "rounded-bl-none"} w-56`}>
+                      <div className="h-3 bg-gray-200 rounded w-20 mb-2" />
+                      <div className="h-4 bg-gray-200 rounded w-full" />
+                      <div className="h-3 bg-gray-200 rounded w-12 mt-2 ml-auto" />
                     </div>
                   </div>
                 ))
+              ) : (
+                <>
+                  {(() => {
+                    const nodes: React.ReactNode[] = [];
+                    let lastDateKey = "";
+
+                    const maybeSeparator = (dk: string, keyPrefix: string) => {
+                      if (dk && dk !== lastDateKey) {
+                        lastDateKey = dk;
+                        nodes.push(
+                          <div key={`sep-${keyPrefix}`} className="flex items-center gap-3 my-1">
+                            <div className="flex-1 h-px bg-gray-100" />
+                            <span className="text-[10px] font-medium text-gray-400 px-2 shrink-0">
+                              {formatDateLabel(dk)}
+                            </span>
+                            <div className="flex-1 h-px bg-gray-100" />
+                          </div>
+                        );
+                      }
+                    };
+
+                    if (selectedTicket.description) {
+                      maybeSeparator(selectedTicket.date, "desc");
+                      nodes.push(
+                        <div key="description" className="flex justify-end">
+                          <div className="max-w-[80%] rounded-xl p-3 shadow-sm bg-red-600 text-white rounded-br-none">
+                            <p className="text-xs opacity-75 mb-1 font-semibold">{selectedTicket.nama}</p>
+                            <p className="text-sm whitespace-pre-wrap">{selectedTicket.description}</p>
+                            <p className="text-[10px] opacity-80 text-right mt-1">
+                              {new Date(selectedTicket.date).toLocaleDateString("id-ID", {
+                                day: "numeric", month: "long", year: "numeric",
+                              })}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    ticketMessages.forEach((msg, idx) => {
+                      maybeSeparator(localDateKey(msg.created_at), `msg-${idx}`);
+                      nodes.push(
+                        <div key={idx} className={`flex ${msg.sender_type === "user" ? "justify-end" : "justify-start"}`}>
+                          <div className={`max-w-[80%] rounded-xl p-3 shadow-sm ${
+                            msg.sender_type === "user"
+                              ? "bg-red-600 text-white rounded-br-none"
+                              : "bg-white border border-gray-200 text-gray-800 rounded-bl-none"
+                          }`}>
+                            <p className="text-xs opacity-75 mb-1 font-semibold">
+                              {msg.sender_name} {msg.sender_type === "admin" && "🛡️"}
+                            </p>
+                            <p className="text-sm whitespace-pre-wrap">{msg.message}</p>
+                            <div className="flex items-center justify-end gap-1 mt-1 text-[10px] opacity-80">
+                              <p>{localTime(msg.created_at)}</p>
+                              {msg.sender_type === "user" && (
+                                <span>
+                                  {msg.is_read ? (
+                                    <div className="flex -space-x-1.5 text-blue-300" title="Dibaca">
+                                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor" className="w-3 h-3">
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                                      </svg>
+                                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor" className="w-3 h-3">
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                                      </svg>
+                                    </div>
+                                  ) : (
+                                    <span title="Terkirim">
+                                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor" className="w-3 h-3 opacity-70">
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                                      </svg>
+                                    </span>
+                                  )}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    });
+
+                    if (ticketMessages.length === 0 && !selectedTicket.description) {
+                      nodes.push(
+                        <p key="empty" className="text-center text-gray-400 text-sm italic mt-6">
+                          Belum ada percakapan pada tiket ini.
+                        </p>
+                      );
+                    }
+
+                    return nodes;
+                  })()}
+                </>
               )}
             </div>
 
             {selectedTicket.status !== "Closed" ? (
               <form onSubmit={handleSendTicketReply} className="p-4 bg-white border-t border-gray-200 flex gap-2 shrink-0">
-                <input
-                  type="text"
+                <textarea
+                  ref={replyTextareaRef}
+                  rows={1}
                   value={replyInput}
-                  onChange={(e) => setReplyInput(e.target.value)}
-                  placeholder="Balas pesan admin di sini..."
-                  className="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-red-500 outline-none text-sm"
+                  onChange={(e) => {
+                    setReplyInput(e.target.value);
+                    e.target.style.height = "auto";
+                    e.target.style.height = e.target.scrollHeight + "px";
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      handleSendTicketReply(e as unknown as React.FormEvent);
+                    }
+                  }}
+                  placeholder="Balas pesan admin di sini... (Shift+Enter untuk baris baru)"
+                  className="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-red-500 outline-none text-sm resize-none max-h-[76px] overflow-y-auto"
                 />
                 <button
                   type="submit"

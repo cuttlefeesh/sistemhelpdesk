@@ -80,7 +80,6 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [loginError, setLoginError] = useState("");
   const [isLoggingIn, setIsLoggingIn] = useState(false);
-  const [isInputFocused, setIsInputFocused] = useState(false);
 
   const [isForgotModalOpen, setIsForgotModalOpen] = useState(false);
   const [forgotNimInput, setForgotNimInput] = useState("");
@@ -130,7 +129,7 @@ export default function LoginPage() {
     <>
       <main className="flex items-center justify-center h-screen bg-gray-50 px-4 relative z-10">
         <div className="max-w-md w-full bg-white rounded-xl shadow-lg p-8 border border-gray-100">
-          <RobotMascot isFocused={isInputFocused} />
+          <RobotMascot isFocused={showPassword} />
           <div className="text-center mb-8">
             <h1 className="text-2xl font-bold text-red-700 mb-2">Helpdesk LAA FTE</h1>
             <p className="text-gray-500 text-sm">Silakan login untuk mengakses layanan kami</p>
@@ -147,8 +146,6 @@ export default function LoginPage() {
                 autoComplete="off"
                 value={nimNip}
                 onChange={(e) => setNimNip(e.target.value)}
-                onFocus={() => setIsInputFocused(true)}
-                onBlur={() => setIsInputFocused(false)}
                 placeholder="Masukkan NIM atau NIP..."
                 className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-red-500 transition"
                 required
@@ -163,8 +160,6 @@ export default function LoginPage() {
                   autoComplete="off"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  onFocus={() => setIsInputFocused(true)}
-                  onBlur={() => setIsInputFocused(false)}
                   placeholder="Masukkan password..."
                   className="w-full border border-gray-300 rounded-lg px-4 py-3 pr-11 focus:outline-none focus:ring-2 focus:ring-red-500 transition"
                   style={{ WebkitTextSecurity: showPassword ? "none" : "disc" } as React.CSSProperties}

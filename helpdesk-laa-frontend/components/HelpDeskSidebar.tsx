@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { usePathname, useSearchParams, useRouter } from "next/navigation";
 import { useUser } from "@/lib/UserContext";
 import type { ChatSession } from "@/lib/types";
+import { getCache, setCache, invalidateCache, clearAllCache } from "@/lib/dataCache";
 
 interface Props {
   isOpen: boolean;
@@ -16,7 +17,7 @@ export default function HelpDeskSidebar({ isOpen, onClose }: Props) {
   const router = useRouter();
   const { userName, nimNip, userRole } = useUser();
 
-  const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
+  const [chatSessions, setChatSessions] = useState<ChatSession[]>(() => getCache<ChatSession>("chat_sessions") ?? []);
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
 
   const currentSessionId = searchParams.get("session") ?? "";
@@ -24,6 +25,8 @@ export default function HelpDeskSidebar({ isOpen, onClose }: Props) {
   // Fetch / refresh riwayat chat setiap kali pathname/searchParams berubah
   useEffect(() => {
     if (!pathname.startsWith("/dashboard")) return;
+    const cached = getCache<ChatSession>("chat_sessions");
+    if (cached) setChatSessions(cached);
     fetch("/api/chat")
       .then((r) => (r.ok ? r.json() : null))
       .then((result) => {
@@ -35,8 +38,10 @@ export default function HelpDeskSidebar({ isOpen, onClose }: Props) {
             }))
             .reverse();
           setChatSessions(sessions);
+          setCache("chat_sessions", sessions);
         } else {
           setChatSessions([]);
+          setCache("chat_sessions", []);
         }
       })
       .catch(() => {});
@@ -62,6 +67,7 @@ export default function HelpDeskSidebar({ isOpen, onClose }: Props) {
       const res = await fetch(`/api/chat?sessionId=${sessionId}`, { method: "DELETE" });
       const result = await res.json();
       if (result.status === "success") {
+        invalidateCache("chat_sessions");
         setChatSessions((prev) => prev.filter((s) => s.sessionId !== sessionId));
         if (currentSessionId === sessionId) router.push("/dashboard/chat");
       } else {
@@ -74,7 +80,8 @@ export default function HelpDeskSidebar({ isOpen, onClose }: Props) {
 
   const handleLogout = async () => {
     await fetch("/api/auth/logout", { method: "POST" });
-    router.push("/");
+    clearAllCache();
+    window.location.replace("/");
   };
 
   const isChat = pathname === "/dashboard/chat";
@@ -138,7 +145,7 @@ export default function HelpDeskSidebar({ isOpen, onClose }: Props) {
                   isChat ? "bg-red-50 text-red-700" : "text-gray-600 hover:bg-gray-50"
                 }`}
               >
-                💬 Chat
+                💬 Chat Baru
               </button>
               <button
                 onClick={() => router.push("/dashboard/tiket")}

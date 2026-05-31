@@ -9,6 +9,7 @@ export type Ticket = {
   nama: string;
   nim: string;
   subject: string;
+  description?: string;
   status: "Open" | "In Progress" | "Closed";
   date: string;
   nama_layanan?: string;

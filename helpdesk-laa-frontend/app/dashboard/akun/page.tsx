@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useUser } from "@/lib/UserContext";
 import { useToast } from "@/lib/useToast";
 import ToastNotification from "@/components/ToastNotification";
+import { clearAllCache } from "@/lib/dataCache";
 
 export default function AkunPage() {
   const router = useRouter();
@@ -21,7 +22,8 @@ export default function AkunPage() {
 
   const handleLogout = async () => {
     await fetch("/api/auth/logout", { method: "POST" });
-    router.push("/");
+    clearAllCache();
+    window.location.replace("/");
   };
 
   return (

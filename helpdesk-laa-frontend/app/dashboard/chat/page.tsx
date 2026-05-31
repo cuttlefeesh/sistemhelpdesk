@@ -6,6 +6,7 @@ import { useState, useEffect, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useUser } from "@/lib/UserContext";
 import type { Message } from "@/lib/types";
+import { getCache, setCache } from "@/lib/dataCache";
 
 const WELCOME_MESSAGE: Message = {
   id: "welcome",
@@ -22,6 +23,7 @@ function ChatPageContent() {
   const [messages, setMessages] = useState<Message[]>([WELCOME_MESSAGE]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingSession, setIsLoadingSession] = useState(false);
   const [currentSessionId, setCurrentSessionId] = useState(() => Date.now().toString());
   const [suggestTicket, setSuggestTicket] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -38,12 +40,17 @@ function ChatPageContent() {
     } else {
       setMessages([WELCOME_MESSAGE]);
       setCurrentSessionId(Date.now().toString());
+      setSuggestTicket(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionFromUrl]);
 
   const loadSpecificSession = async (sessionId: string) => {
     setSuggestTicket(false);
+    const key = `chat_session_${sessionId}`;
+    const cached = getCache<Message>(key);
+    if (cached) { setMessages(cached); setCurrentSessionId(sessionId); return; }
+    setIsLoadingSession(true);
     try {
       const res = await fetch(`/api/chat?sessionId=${sessionId}`);
       const result = await res.json();
@@ -57,16 +64,12 @@ function ChatPageContent() {
         );
         setMessages(historyMessages);
         setCurrentSessionId(sessionId);
+        setCache(key, historyMessages);
       }
     } catch (err) {
       console.error("Gagal memuat sesi:", err);
-    }
-  };
-
-  const handleNewChat = () => {
-    if (confirm("Mulai percakapan baru?")) {
-      setSuggestTicket(false);
-      router.push("/dashboard/chat");
+    } finally {
+      setIsLoadingSession(false);
     }
   };
 
@@ -166,20 +169,17 @@ function ChatPageContent() {
           <h2 className="text-lg font-bold truncate">Asisten Virtual LAA FTE</h2>
           <p className="text-sm opacity-80 truncate">Layanan Helpdesk</p>
         </div>
-        <button
-          onClick={handleNewChat}
-          className="flex items-center gap-2 bg-red-800 hover:bg-red-900 text-white px-3 py-2 rounded-lg transition border border-red-500/30 text-sm font-medium shadow-sm"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-          </svg>
-          <span className="hidden sm:inline">Chat Baru</span>
-        </button>
       </header>
 
       {/* Pesan */}
       <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 bg-gray-50">
-        {messages.map((msg, idx) => (
+        {isLoadingSession ? (
+          Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className={`flex flex-col ${i % 2 === 0 ? "items-end" : "items-start"} animate-pulse`}>
+              <div className={`max-w-[70%] h-16 rounded-xl bg-gray-200 w-64 ${i % 2 === 0 ? "rounded-br-none" : "rounded-bl-none"}`} />
+            </div>
+          ))
+        ) : messages.map((msg, idx) => (
           <div key={msg.id} className={`flex flex-col ${msg.role !== "bot" ? "items-end" : "items-start"}`}>
             <div className={`flex ${msg.role !== "bot" ? "justify-end" : "justify-start"} w-full`}>
               <div

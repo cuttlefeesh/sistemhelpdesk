@@ -5,7 +5,7 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Admin - LAA FTE Telkom University",
+  title: "Admin - Helpdesk Akademik LAA FTE",
   description: "Admin Panel Chatbot Akademik Fakultas Teknik Elektro",
 };
 
