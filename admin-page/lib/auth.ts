@@ -6,13 +6,14 @@ if (!rawSecret) throw new Error("FATAL: JWT_SECRET environment variable is not s
 const SECRET = new TextEncoder().encode(rawSecret);
 
 const COOKIE_NAME = "laa_admin_session";
-const SESSION_DURATION = 60 * 60 * 8; // 8 jam
+const SESSION_DURATION = 60 * 60; // 1 jam
 
 export type AdminPayload = {
   id: number;
   nama: string;
   nim_nip: string;
   role: string;
+  session_id?: string;
 };
 
 export async function signToken(payload: AdminPayload): Promise<string> {

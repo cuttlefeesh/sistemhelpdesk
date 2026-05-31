@@ -39,11 +39,18 @@ export async function POST(request: Request) {
       );
     }
 
+    const sessionId = crypto.randomUUID();
+    await pool.query(
+      "UPDATE user_admin SET session_id = $1 WHERE nip = $2",
+      [sessionId, admin.nim_nip],
+    );
+
     const token = await signToken({
       id: admin.id,
       nama: admin.nama,
       nim_nip: admin.nim_nip,
       role: admin.role,
+      session_id: sessionId,
     });
 
     const response = NextResponse.json({

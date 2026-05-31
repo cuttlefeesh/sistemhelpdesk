@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import Image from "next/image";
 import Sidebar from "@/components/Sidebar";
+import { clearAllCache } from "@/lib/dataCache";
 
 export default function DashboardLayout({
   children,
@@ -11,6 +12,43 @@ export default function DashboardLayout({
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const closeSidebar = useCallback(() => setSidebarOpen(false), []);
+
+  const INACTIVITY_LIMIT = 60 * 60 * 1000;
+  const REFRESH_INTERVAL = 5 * 60 * 1000;
+  const CHECK_EVERY = 60 * 1000;
+  const lastActivityRef = useRef(Date.now());
+  const lastRefreshRef = useRef(Date.now());
+
+  useEffect(() => {
+    const onActivity = () => {
+      const now = Date.now();
+      lastActivityRef.current = now;
+      if (now - lastRefreshRef.current > REFRESH_INTERVAL) {
+        lastRefreshRef.current = now;
+        fetch("/api/auth/refresh", { method: "POST" })
+          .then((res) => { if (res.status === 401) { clearAllCache(); window.location.replace("/"); } })
+          .catch(() => {});
+      }
+    };
+
+    const checkInactivity = () => {
+      if (Date.now() - lastActivityRef.current > INACTIVITY_LIMIT) {
+        fetch("/api/auth/logout", { method: "POST" }).finally(() => {
+          clearAllCache();
+          window.location.replace("/");
+        });
+      }
+    };
+
+    const events = ["mousemove", "mousedown", "keydown", "scroll", "touchstart", "click"];
+    events.forEach((e) => window.addEventListener(e, onActivity, { passive: true }));
+    const timer = setInterval(checkInactivity, CHECK_EVERY);
+
+    return () => {
+      events.forEach((e) => window.removeEventListener(e, onActivity));
+      clearInterval(timer);
+    };
+  }, []);
 
   return (
     <div className="flex bg-[#f3f4f6] min-h-screen">

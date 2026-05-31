@@ -162,6 +162,41 @@ export default function TiketPage() {
 
   useEffect(() => { setPage(1); }, [searchTicket, filterDate, filterStatus]);
 
+  useEffect(() => {
+    if (!selectedTicket) return;
+
+    const poll = async () => {
+      try {
+        const res = await fetch(`/api/tickets/messages?ticketId=${selectedTicket.id}`);
+        const result = await res.json();
+        if (result.status === "success" && Array.isArray(result.data)) {
+          setTicketMessages((prev) => {
+            if (result.data.length === prev.length) return prev;
+            setCache(`ticket_messages_${selectedTicket.id}`, result.data);
+            return result.data;
+          });
+        }
+      } catch { /* noop */ }
+    };
+
+    let interval: ReturnType<typeof setInterval> | null = null;
+    const start = () => { interval = setInterval(poll, 3000); };
+    const stop  = () => { if (interval) { clearInterval(interval); interval = null; } };
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "hidden") stop();
+      else { poll(); start(); }
+    };
+
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    if (document.visibilityState !== "hidden") start();
+
+    return () => {
+      stop();
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [selectedTicket?.id]);
+
   const filteredTickets = tickets.filter((ticket) => {
     const matchSearch =
       ticket.subject.toLowerCase().includes(searchTicket.toLowerCase()) ||

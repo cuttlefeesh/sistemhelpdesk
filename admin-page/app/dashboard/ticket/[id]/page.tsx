@@ -173,6 +173,39 @@ export default function TicketDetailPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
+  // Poll pesan baru setiap 3 detik, berhenti saat tab tidak aktif
+  useEffect(() => {
+    const poll = async () => {
+      try {
+        const res = await fetch(`/api/tickets/${id}/messages`);
+        const data = await res.json();
+        if (!Array.isArray(data)) return;
+        setMessages((prev) => {
+          if (data.length === prev.length) return prev;
+          setCache(MSG_CACHE_KEY, data);
+          return data;
+        });
+      } catch { /* noop */ }
+    };
+
+    let interval: ReturnType<typeof setInterval> | null = null;
+    const start = () => { interval = setInterval(poll, 3000); };
+    const stop  = () => { if (interval) { clearInterval(interval); interval = null; } };
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "hidden") stop();
+      else { poll(); start(); }
+    };
+
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    if (document.visibilityState !== "hidden") start();
+
+    return () => {
+      stop();
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [id]);
+
   // Auto-scroll to bottom
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });

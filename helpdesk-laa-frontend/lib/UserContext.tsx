@@ -44,7 +44,10 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     fetch("/api/auth/me")
-      .then((r) => (r.ok ? r.json() : null))
+      .then((r) => {
+        if (r.status === 401) { window.location.replace("/"); return null; }
+        return r.ok ? r.json() : null;
+      })
       .then((data) => {
         if (data?.nim_nip) {
           setNimNip(data.nim_nip);

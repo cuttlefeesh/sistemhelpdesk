@@ -49,6 +49,12 @@ export async function POST(request: Request) {
       detectedRole = "Dosen";
     }
 
+    const sessionId = crypto.randomUUID();
+    await pool.query(
+      "UPDATE users SET session_id = $1 WHERE nim_nip = $2",
+      [sessionId, user.nim_nip],
+    );
+
     const token = await signToken({
       id: user.id,
       nim_nip: user.nim_nip,
@@ -57,6 +63,7 @@ export async function POST(request: Request) {
       role: detectedRole,
       prodi: user.prodi,
       kelas: user.kelas,
+      session_id: sessionId,
     });
 
     const response = NextResponse.json({

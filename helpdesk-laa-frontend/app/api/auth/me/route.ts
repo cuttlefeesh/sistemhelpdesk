@@ -8,6 +8,15 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  // Verifikasi session masih aktif (single-session enforcement)
+  const sessionCheck = await pool.query(
+    "SELECT session_id FROM users WHERE nim_nip = $1",
+    [session.nim_nip],
+  );
+  if (!sessionCheck.rows[0] || sessionCheck.rows[0].session_id !== session.session_id) {
+    return NextResponse.json({ error: "Session invalidated" }, { status: 401 });
+  }
+
   // kode_dosen tidak ada di JWT — ambil dari DB hanya untuk user Dosen
   let kodeDosen: string | null = null;
   if (session.role === "Dosen") {
