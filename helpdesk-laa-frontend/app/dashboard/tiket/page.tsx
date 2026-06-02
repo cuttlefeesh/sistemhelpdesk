@@ -286,6 +286,22 @@ export default function TiketPage() {
 
   return (
     <div className="flex-1 flex flex-col h-full bg-gray-50 overflow-hidden relative">
+      {/* Header mobile */}
+      <header className="md:hidden bg-red-700 text-white px-4 py-3 flex items-center gap-3 shadow-sm z-10 shrink-0">
+        <button
+          className="p-1 -ml-1 rounded hover:bg-red-800 transition focus:outline-none shrink-0"
+          aria-label="Buka menu"
+          onClick={() => window.dispatchEvent(new CustomEvent("open-sidebar"))}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-6 h-6">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+          </svg>
+        </button>
+        <div className="flex-1">
+          <h2 className="text-base font-bold">Asisten Virtual LAA FTE</h2>
+          <p className="text-xs opacity-80">Layanan Helpdesk</p>
+        </div>
+      </header>
       <div className="flex-1 overflow-y-auto p-4 md:p-8">
         <div className="space-y-6">
           {/* Header */}
@@ -356,28 +372,28 @@ export default function TiketPage() {
             <div className="overflow-x-auto" id="tiket-table">
               <table className="w-full text-left border-collapse min-w-[600px]">
                 <thead>
-                  <tr className="bg-gray-50 border-b border-gray-200 text-sm text-gray-500 uppercase tracking-wider">
-                    <th className="px-6 py-4 font-medium">ID Tiket</th>
-                    <th className="px-6 py-4 font-medium">NIM</th>
-                    <th className="px-6 py-4 font-medium">Nama</th>
-                    <th className="px-6 py-4 font-medium">Kategori</th>
-                    <th className="px-6 py-4 font-medium">Subjek / Masalah</th>
-                    <th className="px-6 py-4 font-medium">Tanggal Dibuat</th>
-                    <th className="px-6 py-4 font-medium">Status</th>
-                    <th className="px-6 py-4 font-medium w-10" />
+                  <tr className="bg-gray-50 border-b border-gray-200 text-[10px] md:text-sm text-gray-500 uppercase tracking-wider">
+                    <th className="px-3 py-2 md:px-6 md:py-4 font-medium">ID Tiket</th>
+                    <th className="px-3 py-2 md:px-6 md:py-4 font-medium">NIM</th>
+                    <th className="px-3 py-2 md:px-6 md:py-4 font-medium">Nama</th>
+                    <th className="px-3 py-2 md:px-6 md:py-4 font-medium">Kategori</th>
+                    <th className="px-3 py-2 md:px-6 md:py-4 font-medium">Subjek / Masalah</th>
+                    <th className="px-3 py-2 md:px-6 md:py-4 font-medium">Tanggal Dibuat</th>
+                    <th className="px-3 py-2 md:px-6 md:py-4 font-medium">Status</th>
+                    <th className="px-3 py-2 md:px-6 md:py-4 font-medium w-10" />
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200 text-sm">
+                <tbody className="divide-y divide-gray-200 text-xs md:text-sm">
                   {loadingTickets ? (
                     Array.from({ length: 6 }).map((_, i) => (
                       <tr key={i} className="animate-pulse border-b border-gray-50">
-                        <td className="px-6 py-4"><div className="h-4 bg-gray-100 rounded w-20" /></td>
-                        <td className="px-6 py-4"><div className="h-4 bg-gray-100 rounded w-24" /></td>
-                        <td className="px-6 py-4"><div className="h-4 bg-gray-100 rounded w-32" /></td>
-                        <td className="px-6 py-4"><div className="h-4 bg-gray-100 rounded w-20" /></td>
-                        <td className="px-6 py-4"><div className="h-4 bg-gray-100 rounded w-48" /></td>
-                        <td className="px-6 py-4"><div className="h-4 bg-gray-100 rounded w-24" /></td>
-                        <td className="px-6 py-4"><div className="h-6 bg-gray-100 rounded-full w-20" /></td>
+                        <td className="px-3 py-2 md:px-6 md:py-4"><div className="h-4 bg-gray-100 rounded w-20" /></td>
+                        <td className="px-3 py-2 md:px-6 md:py-4"><div className="h-4 bg-gray-100 rounded w-24" /></td>
+                        <td className="px-3 py-2 md:px-6 md:py-4"><div className="h-4 bg-gray-100 rounded w-32" /></td>
+                        <td className="px-3 py-2 md:px-6 md:py-4"><div className="h-4 bg-gray-100 rounded w-20" /></td>
+                        <td className="px-3 py-2 md:px-6 md:py-4"><div className="h-4 bg-gray-100 rounded w-48" /></td>
+                        <td className="px-3 py-2 md:px-6 md:py-4"><div className="h-4 bg-gray-100 rounded w-24" /></td>
+                        <td className="px-3 py-2 md:px-6 md:py-4"><div className="h-6 bg-gray-100 rounded-full w-20" /></td>
                         <td className="px-3 py-4" />
                       </tr>
                     ))
@@ -389,15 +405,15 @@ export default function TiketPage() {
                         className="hover:bg-gray-100 transition cursor-pointer"
                         title="Klik untuk melihat percakapan"
                       >
-                        <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap">{ticket.id}</td>
-                        <td className="px-6 py-4 text-gray-600 whitespace-nowrap">{ticket.nim}</td>
-                        <td className="px-6 py-4 text-gray-600 whitespace-nowrap">{ticket.nama}</td>
-                        <td className="px-6 py-4 text-red-600 font-medium whitespace-nowrap">{ticket.nama_layanan || "Umum"}</td>
-                        <td className="px-6 py-4 text-gray-600">{ticket.subject}</td>
-                        <td className="px-6 py-4 text-gray-500 whitespace-nowrap">
+                        <td className="px-3 py-2 md:px-6 md:py-4 font-medium text-gray-900 whitespace-nowrap">{ticket.id}</td>
+                        <td className="px-3 py-2 md:px-6 md:py-4 text-gray-600 whitespace-nowrap">{ticket.nim}</td>
+                        <td className="px-3 py-2 md:px-6 md:py-4 text-gray-600 whitespace-nowrap">{ticket.nama}</td>
+                        <td className="px-3 py-2 md:px-6 md:py-4 text-red-600 font-medium whitespace-nowrap">{ticket.nama_layanan || "Umum"}</td>
+                        <td className="px-3 py-2 md:px-6 md:py-4 text-gray-600">{ticket.subject}</td>
+                        <td className="px-3 py-2 md:px-6 md:py-4 text-gray-500 whitespace-nowrap">
                           {new Date(ticket.date).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-3 py-2 md:px-6 md:py-4 whitespace-nowrap">
                           <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${
                             ticket.status === "Open"
                               ? "bg-yellow-50 text-yellow-700 border-yellow-200"

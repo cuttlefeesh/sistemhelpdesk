@@ -10,6 +10,11 @@ import { getCache, setCache } from "@/lib/dataCache";
 
 type Service = { id: number; nama_layanan: string };
 
+const shuffleAndFilter = (data: Service[]): Service[] =>
+  data
+    .filter((s) => s.nama_layanan !== "Informasi Dosen")
+    .sort(() => Math.random() - 0.5);
+
 const WELCOME_MESSAGE: Message = {
   id: "welcome",
   role: "bot",
@@ -43,8 +48,9 @@ function ChatPageContent() {
       .then((r) => (r.ok ? r.json() : null))
       .then((result) => {
         if (result?.status === "success") {
-          setServiceChips(result.data);
-          setCache(key, result.data);
+          const shuffled = shuffleAndFilter(result.data);
+          setServiceChips(shuffled);
+          setCache(key, shuffled);
         }
       })
       .catch(() => {});
@@ -60,8 +66,9 @@ function ChatPageContent() {
       .then((r) => (r.ok ? r.json() : null))
       .then((result) => {
         if (result?.status === 'success') {
-          setMhsServiceChips(result.data);
-          setCache(key, result.data);
+          const shuffled = shuffleAndFilter(result.data);
+          setMhsServiceChips(shuffled);
+          setCache(key, shuffled);
         }
       })
       .catch(() => {});
@@ -205,6 +212,15 @@ function ChatPageContent() {
     <div className="flex flex-col h-full w-full bg-white overflow-hidden">
       {/* Header */}
       <header className="bg-red-700 text-white p-4 sm:p-5 flex items-center shadow-sm z-10 gap-4 shrink-0">
+        <button
+          className="md:hidden p-1 -ml-1 rounded hover:bg-red-800 transition focus:outline-none shrink-0"
+          aria-label="Buka menu"
+          onClick={() => window.dispatchEvent(new CustomEvent("open-sidebar"))}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-6 h-6">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+          </svg>
+        </button>
         <div className="flex-1">
           <h2 className="text-lg font-bold truncate">Asisten Virtual LAA FTE</h2>
           <p className="text-sm opacity-80 truncate">Layanan Helpdesk</p>
@@ -255,7 +271,7 @@ function ChatPageContent() {
                     <div className="p-3 flex flex-wrap gap-2">
                       {(activeServiceTab === 'mhs' && userRole?.toLowerCase() === 'dosen'
                         ? mhsServiceChips : serviceChips
-                      ).map((svc) => (
+                      ).slice(0, 5).map((svc) => (
                         <button key={svc.id}
                           onClick={() => setInput(`Saya ingin bertanya tentang ${svc.nama_layanan}`)}
                           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border border-red-100 bg-red-50/70 text-red-700 hover:bg-red-100 hover:border-red-200 transition"

@@ -31,15 +31,17 @@ export default function AkunPage() {
       {/* Header */}
       <header className="bg-red-700 text-white px-4 py-3 flex items-center shadow-sm z-10 gap-4 shrink-0">
         <button
-          className="p-1.5 -ml-1 rounded-full hover:bg-red-800 transition focus:outline-none"
-          onClick={() => router.push("/dashboard/chat")}
+          className="md:hidden p-1 -ml-1 rounded hover:bg-red-800 transition focus:outline-none shrink-0"
+          aria-label="Buka menu"
+          onClick={() => window.dispatchEvent(new CustomEvent("open-sidebar"))}
         >
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-5 h-5">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-6 h-6">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
           </svg>
         </button>
-        <div className="flex-1 text-center pr-7">
-          <h2 className="text-base font-bold">Profil Pengguna</h2>
+        <div className="flex-1">
+          <h2 className="text-base font-bold">Asisten Virtual LAA FTE</h2>
+          <p className="text-xs opacity-80">Layanan Helpdesk</p>
         </div>
       </header>
 
