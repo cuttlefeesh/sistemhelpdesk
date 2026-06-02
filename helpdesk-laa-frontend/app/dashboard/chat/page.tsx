@@ -8,6 +8,8 @@ import { useUser } from "@/lib/UserContext";
 import type { Message } from "@/lib/types";
 import { getCache, setCache } from "@/lib/dataCache";
 
+type Service = { id: number; nama_layanan: string };
+
 const WELCOME_MESSAGE: Message = {
   id: "welcome",
   role: "bot",
@@ -26,7 +28,44 @@ function ChatPageContent() {
   const [isLoadingSession, setIsLoadingSession] = useState(false);
   const [currentSessionId, setCurrentSessionId] = useState(() => Date.now().toString());
   const [suggestTicket, setSuggestTicket] = useState(false);
+  const [serviceChips, setServiceChips] = useState<Service[]>([]);
+  const [mhsServiceChips, setMhsServiceChips] = useState<Service[]>([]);
+  const [activeServiceTab, setActiveServiceTab] = useState<'own' | 'mhs'>('own');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Fetch layanan sesuai role (reuse cache dari sidebar)
+  useEffect(() => {
+    if (!userRole) return;
+    const key = `services_${userRole}`;
+    const cached = getCache<Service>(key);
+    if (cached) { setServiceChips(cached); return; }
+    fetch(`/api/services?role=${userRole}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((result) => {
+        if (result?.status === "success") {
+          setServiceChips(result.data);
+          setCache(key, result.data);
+        }
+      })
+      .catch(() => {});
+  }, [userRole]);
+
+  // Fetch Layanan Mahasiswa untuk tab kedua Dosen
+  useEffect(() => {
+    if (userRole?.toLowerCase() !== 'dosen') return;
+    const key = 'services_Mahasiswa';
+    const cached = getCache<Service>(key);
+    if (cached) { setMhsServiceChips(cached); return; }
+    fetch('/api/services?role=Mahasiswa')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((result) => {
+        if (result?.status === 'success') {
+          setMhsServiceChips(result.data);
+          setCache(key, result.data);
+        }
+      })
+      .catch(() => {});
+  }, [userRole]);
 
   // Scroll ke bawah setiap ada pesan baru
   useEffect(() => {
@@ -41,6 +80,7 @@ function ChatPageContent() {
       setMessages([WELCOME_MESSAGE]);
       setCurrentSessionId(Date.now().toString());
       setSuggestTicket(false);
+      setActiveServiceTab('own');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionFromUrl]);
@@ -179,24 +219,72 @@ function ChatPageContent() {
               <div className={`max-w-[70%] h-16 rounded-xl bg-gray-200 w-64 ${i % 2 === 0 ? "rounded-br-none" : "rounded-bl-none"}`} />
             </div>
           ))
-        ) : messages.map((msg, idx) => (
+        ) : messages.map((msg, idx) => {
+          const showServiceTabs =
+            msg.id === 'welcome' &&
+            messages.length === 1 &&
+            !sessionFromUrl &&
+            !isLoadingSession &&
+            serviceChips.length > 0;
+
+          return (
           <div key={msg.id} className={`flex flex-col ${msg.role !== "bot" ? "items-end" : "items-start"}`}>
             <div className={`flex ${msg.role !== "bot" ? "justify-end" : "justify-start"} w-full`}>
-              <div
-                className={`max-w-[85%] md:max-w-[75%] p-4 rounded-xl shadow-sm ${
-                  msg.role !== "bot"
-                    ? "bg-red-600 text-white rounded-br-none"
-                    : "bg-white border border-gray-200 text-gray-800 rounded-bl-none"
-                }`}
-              >
-                {msg.role !== "bot" ? (
-                  <span className="whitespace-pre-wrap">{msg.content}</span>
-                ) : (
-                  <div className="space-y-2 [&>ul]:list-disc [&>ul]:pl-5 [&>ol]:list-decimal [&>ol]:pl-5 [&>strong]:font-bold [&>p]:mb-1 [&>p]:whitespace-pre-wrap">
-                    <ReactMarkdown>{msg.content}</ReactMarkdown>
+              {showServiceTabs ? (
+                <div className="w-[92%] md:w-[85%] rounded-xl shadow-sm bg-white border border-gray-200 text-gray-800 rounded-bl-none overflow-hidden">
+                  <div className="p-4">
+                    <div className="space-y-2 [&>ul]:list-disc [&>ul]:pl-5 [&>ol]:list-decimal [&>ol]:pl-5 [&>strong]:font-bold [&>p]:mb-1 [&>p]:whitespace-pre-wrap">
+                      <ReactMarkdown>{msg.content}</ReactMarkdown>
+                    </div>
                   </div>
-                )}
-              </div>
+                  <div className="border-t border-gray-100">
+                    {userRole?.toLowerCase() === 'dosen' ? (
+                      <div className="flex border-b border-gray-100 bg-gray-50/50">
+                        <button onClick={() => setActiveServiceTab('own')} className={`flex-1 py-2 text-xs font-semibold transition border-b-2 ${activeServiceTab === 'own' ? 'text-red-600 border-red-500 bg-white' : 'text-gray-400 border-transparent hover:text-gray-600'}`}>
+                          👨‍🏫 Layanan Dosen
+                        </button>
+                        <button onClick={() => setActiveServiceTab('mhs')} className={`flex-1 py-2 text-xs font-semibold transition border-b-2 ${activeServiceTab === 'mhs' ? 'text-red-600 border-red-500 bg-white' : 'text-gray-400 border-transparent hover:text-gray-600'}`}>
+                          🎓 Layanan Mahasiswa
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="px-3 py-2 bg-gray-50/50">
+                        <p className="text-xs font-semibold text-gray-400">📚 Layanan Tersedia</p>
+                      </div>
+                    )}
+                    <div className="p-3 flex flex-wrap gap-2">
+                      {(activeServiceTab === 'mhs' && userRole?.toLowerCase() === 'dosen'
+                        ? mhsServiceChips : serviceChips
+                      ).map((svc) => (
+                        <button key={svc.id}
+                          onClick={() => setInput(`Saya ingin bertanya tentang ${svc.nama_layanan}`)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border border-red-100 bg-red-50/70 text-red-700 hover:bg-red-100 hover:border-red-200 transition"
+                        >
+                          <span className="w-1.5 h-1.5 rounded-full bg-red-400 shrink-0" />
+                          {svc.nama_layanan}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-[10.5px] text-gray-400 italic px-3 pb-2">Klik layanan untuk memulai percakapan</p>
+                  </div>
+                </div>
+              ) : (
+                <div
+                  className={`max-w-[85%] md:max-w-[75%] p-4 rounded-xl shadow-sm ${
+                    msg.role !== "bot"
+                      ? "bg-red-600 text-white rounded-br-none"
+                      : "bg-white border border-gray-200 text-gray-800 rounded-bl-none"
+                  }`}
+                >
+                  {msg.role !== "bot" ? (
+                    <span className="whitespace-pre-wrap">{msg.content}</span>
+                  ) : (
+                    <div className="space-y-2 [&>ul]:list-disc [&>ul]:pl-5 [&>ol]:list-decimal [&>ol]:pl-5 [&>strong]:font-bold [&>p]:mb-1 [&>p]:whitespace-pre-wrap">
+                      <ReactMarkdown>{msg.content}</ReactMarkdown>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Tombol Buat Tiket — hanya di pesan bot terakhir saat suggest_ticket = true */}
@@ -212,7 +300,8 @@ function ChatPageContent() {
               </button>
             )}
           </div>
-        ))}
+        ); })}
+
         {isLoading && (
           <div className="flex justify-start">
             <div className="bg-white border border-gray-200 text-gray-500 p-4 rounded-xl rounded-bl-none italic text-sm shadow-sm flex space-x-2">

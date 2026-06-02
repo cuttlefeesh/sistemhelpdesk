@@ -21,7 +21,7 @@ export async function POST(request: Request) {
 
   try {
     const result = await pool.query(
-      "SELECT id, nim_nip, nama, email, password, prodi, kelas, kode_dosen FROM users WHERE nim_nip = $1 AND role != 'admin'",
+      "SELECT id, nim_nip, nama, email, password, role, prodi, kelas, kode_dosen FROM users WHERE nim_nip = $1 AND role != 'admin'",
       [nimNip],
     );
 
@@ -42,11 +42,18 @@ export async function POST(request: Request) {
       );
     }
 
-    let detectedRole = "User";
-    if (user.kelas && user.kelas !== "") {
+    const rawRole = (user.role || "").toLowerCase();
+    let detectedRole: string;
+    if (rawRole === "mahasiswa") {
       detectedRole = "Mahasiswa";
-    } else if (user.kode_dosen && user.kode_dosen !== "") {
+    } else if (rawRole === "dosen") {
       detectedRole = "Dosen";
+    } else if (user.kelas && user.kelas !== "") {
+      detectedRole = "Mahasiswa"; // fallback jika kolom role kosong
+    } else if (user.kode_dosen && user.kode_dosen !== "") {
+      detectedRole = "Dosen"; // fallback jika kolom role kosong
+    } else {
+      detectedRole = "User";
     }
 
     const sessionId = crypto.randomUUID();
