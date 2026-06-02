@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useState, useEffect } from "react";
+import { handleSessionExpired } from "@/lib/sessionUtils";
 
 type UserData = {
   nimNip: string;
@@ -45,7 +46,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     fetch("/api/auth/me")
       .then((r) => {
-        if (r.status === 401) { window.location.replace("/"); return null; }
+        if (r.status === 401) { handleSessionExpired(); return null; }
         return r.ok ? r.json() : null;
       })
       .then((data) => {

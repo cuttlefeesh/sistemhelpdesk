@@ -3,7 +3,7 @@
 import { Suspense, useState, useCallback, useEffect, useRef } from "react";
 import { UserProvider } from "@/lib/UserContext";
 import HelpDeskSidebar from "@/components/HelpDeskSidebar";
-import { clearAllCache } from "@/lib/dataCache";
+import { handleSessionExpired } from "@/lib/sessionUtils";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -22,17 +22,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       if (now - lastRefreshRef.current > REFRESH_INTERVAL) {
         lastRefreshRef.current = now;
         fetch("/api/auth/refresh", { method: "POST" })
-          .then((res) => { if (res.status === 401) { clearAllCache(); window.location.replace("/"); } })
+          .then((res) => { if (res.status === 401) handleSessionExpired(); })
           .catch(() => {});
       }
     };
 
     const checkInactivity = () => {
       if (Date.now() - lastActivityRef.current > INACTIVITY_LIMIT) {
-        fetch("/api/auth/logout", { method: "POST" }).finally(() => {
-          clearAllCache();
-          window.location.replace("/");
-        });
+        handleSessionExpired();
       }
     };
 

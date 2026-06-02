@@ -6,8 +6,8 @@ export async function POST() {
   const session = await getSession();
   if (session?.nim_nip) {
     await pool.query(
-      "UPDATE users SET session_id = NULL WHERE nim_nip = $1",
-      [session.nim_nip],
+      "UPDATE users SET session_id = NULL WHERE nim_nip = $1 AND session_id = $2",
+      [session.nim_nip, session.session_id ?? null],
     ).catch(() => {});
   }
   const response = NextResponse.json({ status: "success" });
