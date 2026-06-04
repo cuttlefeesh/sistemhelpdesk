@@ -71,6 +71,10 @@
   }
   .th-cell:last-child { border-right: none; }
 
+  .ticket-table .th-cell {
+    padding: 0.625rem 0.75rem;
+  }
+
   @media (max-width: 767px) {
     .th-cell {
       font-size: 0.5625rem;

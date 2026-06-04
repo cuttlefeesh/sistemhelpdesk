@@ -127,6 +127,8 @@ export default function TicketPage() {
       const data: Ticket[] = await res.json();
       setCache(CACHE_KEY, data);
       setTickets(data);
+      const total = data.reduce((sum: number, t: Ticket) => sum + (t.unread_count ?? 0), 0);
+      window.dispatchEvent(new CustomEvent("tickets-unread-updated", { detail: { total } }));
     } catch {
       if (showLoading) setApiError("Tidak dapat terhubung ke database. Periksa koneksi dan konfigurasi.");
     } finally {
@@ -148,6 +150,26 @@ export default function TicketPage() {
     } else {
       fetchFromApi(true);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    let interval: ReturnType<typeof setInterval> | null = null;
+    const start = () => { interval = setInterval(() => fetchFromApi(false), 3000); };
+    const stop  = () => { if (interval) { clearInterval(interval); interval = null; } };
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "hidden") stop();
+      else { fetchFromApi(false); start(); }
+    };
+
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    if (document.visibilityState !== "hidden") start();
+
+    return () => {
+      stop();
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -458,7 +480,7 @@ export default function TicketPage() {
             </div>
         </div>
 
-        <div className="overflow-x-auto rounded-b-xl">
+        <div className="overflow-x-auto rounded-b-xl ticket-table">
           <table className="w-full text-xs md:text-sm">
             <thead>
               <tr>
@@ -479,28 +501,28 @@ export default function TicketPage() {
               {loading ? (
                 Array.from({ length: 6 }).map((_, i) => (
                   <tr key={i} className="animate-pulse border-b border-gray-50">
-                    <td className="px-3 py-2 md:px-6 md:py-4"><div className="h-4 bg-gray-100 rounded w-6" /></td>
-                    <td className="px-3 py-2 md:px-6 md:py-4"><div className="h-4 bg-gray-100 rounded w-20" /></td>
-                    <td className="px-3 py-2 md:px-6 md:py-4">
+                    <td className="px-3 py-2 md:px-3 md:py-3"><div className="h-4 bg-gray-100 rounded w-6" /></td>
+                    <td className="px-3 py-2 md:px-3 md:py-3"><div className="h-4 bg-gray-100 rounded w-20" /></td>
+                    <td className="px-3 py-2 md:px-3 md:py-3">
                       <div className="h-4 bg-gray-100 rounded w-32 mb-1.5" />
                       <div className="h-3 bg-gray-100 rounded w-20" />
                     </td>
-                    <td className="px-3 py-2 md:px-6 md:py-4"><div className="h-4 bg-gray-100 rounded w-24" /></td>
-                    <td className="px-3 py-2 md:px-6 md:py-4"><div className="h-4 bg-gray-100 rounded w-40" /></td>
-                    <td className="px-3 py-2 md:px-6 md:py-4">
+                    <td className="px-3 py-2 md:px-3 md:py-3"><div className="h-4 bg-gray-100 rounded w-24" /></td>
+                    <td className="px-3 py-2 md:px-3 md:py-3"><div className="h-4 bg-gray-100 rounded w-40" /></td>
+                    <td className="px-3 py-2 md:px-3 md:py-3">
                       <div className="h-3 bg-gray-100 rounded w-48 mb-1.5" />
                       <div className="h-3 bg-gray-100 rounded w-32" />
                     </td>
-                    <td className="px-3 py-2 md:px-6 md:py-4"><div className="h-4 bg-gray-100 rounded w-24" /></td>
-                    <td className="px-3 py-2 md:px-6 md:py-4"><div className="h-4 bg-gray-100 rounded w-14" /></td>
-                    <td className="px-3 py-2 md:px-6 md:py-4"><div className="h-6 bg-gray-100 rounded-full w-24" /></td>
-                    <td className="px-3 py-2 md:px-6 md:py-4"><div className="h-4 bg-gray-100 rounded w-28" /></td>
+                    <td className="px-3 py-2 md:px-3 md:py-3"><div className="h-4 bg-gray-100 rounded w-24" /></td>
+                    <td className="px-3 py-2 md:px-3 md:py-3"><div className="h-4 bg-gray-100 rounded w-14" /></td>
+                    <td className="px-3 py-2 md:px-3 md:py-3"><div className="h-6 bg-gray-100 rounded-full w-24" /></td>
+                    <td className="px-3 py-2 md:px-3 md:py-3"><div className="h-4 bg-gray-100 rounded w-28" /></td>
                     <td className="px-3 py-4" />
                   </tr>
                 ))
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={11} className="px-6 py-12 text-center">
+                  <td colSpan={11} className="px-3 py-12 text-center">
                     <div className="flex flex-col items-center gap-2">
                       <svg xmlns="http://www.w3.org/2000/svg" className="w-8 h-8 text-gray-200" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z" />
@@ -525,25 +547,25 @@ export default function TicketPage() {
                       onClick={() => router.push(`/dashboard/ticket/${ticket.id}`)}
                       className="hover:bg-slate-50/80 transition cursor-pointer"
                     >
-                      <td className="px-3 py-2 md:px-6 md:py-4 text-gray-500">{(page - 1) * PAGE_SIZE + idx + 1}</td>
-                      <td className="px-3 py-2 md:px-6 md:py-4 text-gray-600 font-mono text-xs">{ticket.id}</td>
-                      <td className="px-3 py-2 md:px-6 md:py-4">
+                      <td className="px-3 py-2 md:px-3 md:py-3 text-gray-500">{(page - 1) * PAGE_SIZE + idx + 1}</td>
+                      <td className="px-3 py-2 md:px-3 md:py-3 text-gray-600 font-mono text-xs max-w-[90px]"><p className="truncate">{ticket.id}</p></td>
+                      <td className="px-3 py-2 md:px-3 md:py-3">
                         <p className="text-gray-800 font-medium">{ticket.nama || "—"}</p>
                         {ticket.nim && <p className="text-gray-400 text-xs font-mono">{ticket.nim}</p>}
                       </td>
-                      <td className="px-3 py-2 md:px-6 md:py-4 text-gray-600 text-xs">
+                      <td className="px-3 py-2 md:px-3 md:py-3 text-gray-600 text-xs">
                         {ticket.nama_layanan || <span className="text-gray-300">—</span>}
                       </td>
-                      <td className="px-3 py-2 md:px-6 md:py-4 text-gray-700 max-w-[180px]">
+                      <td className="px-3 py-2 md:px-3 md:py-3 text-gray-700 max-w-[180px]">
                         <p className="truncate">{ticket.subject || "—"}</p>
                       </td>
-                      <td className="px-3 py-2 md:px-6 md:py-4 text-gray-500 max-w-[220px]">
+                      <td className="px-3 py-2 md:px-3 md:py-3 text-gray-500 max-w-[130px]">
                         <p className="line-clamp-2 text-xs leading-relaxed">{ticket.description || "—"}</p>
                       </td>
-                      <td className="px-3 py-2 md:px-6 md:py-4 text-gray-500 whitespace-nowrap">
+                      <td className="px-3 py-2 md:px-3 md:py-3 text-gray-500 whitespace-nowrap">
                         {formatDate(ticketDate)}
                       </td>
-                      <td className="px-3 py-2 md:px-6 md:py-4 whitespace-nowrap">
+                      <td className="px-3 py-2 md:px-3 md:py-3 whitespace-nowrap">
                         {(() => {
                           const isClosed = ticket.status?.toLowerCase() === "closed";
                           const endDate = isClosed ? ticket.updated_at : null;
@@ -555,12 +577,12 @@ export default function TicketPage() {
                           );
                         })()}
                       </td>
-                      <td className="px-3 py-2 md:px-6 md:py-4">
+                      <td className="px-3 py-2 md:px-3 md:py-3">
                         <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${statusStyle(ticket.status)}`}>
                           {statusLabel(ticket.status)}
                         </span>
                       </td>
-                      <td className="px-3 py-2 md:px-6 md:py-4">
+                      <td className="px-3 py-2 md:px-3 md:py-3">
                         {ticket.handled_by ? (
                           <span className={`text-xs font-medium ${ticket.handled_by === currentAdmin ? "text-red-600" : "text-gray-600"}`}>
                             {ticket.handled_by === currentAdmin ? "Me" : ticket.handled_by}

@@ -362,7 +362,7 @@ export default function UserManagement() {
 
       <div className="bg-white rounded-xl shadow-sm border border-[#e8edf5] overflow-hidden">
         {/* Header toolbar */}
-        <div className="px-4 md:px-6 py-3 md:py-4 border-b border-gray-100 flex flex-col gap-2">
+        <div className="px-4 md:px-6 py-3 md:py-4 border-b border-gray-100 flex flex-col md:flex-row md:items-center md:justify-between gap-2">
           <div className="flex items-center gap-3">
             <h2 className="text-base font-semibold text-gray-700">
               Daftar {tabLabel}{" "}
@@ -410,7 +410,7 @@ export default function UserManagement() {
               </button>
 
               {filterOpen && (
-                <div className="absolute left-0 md:left-auto md:right-0 top-full mt-1.5 z-30 bg-white border border-gray-200 rounded-xl shadow-lg w-64 p-4 flex flex-col gap-4">
+                <div className="absolute left-0 top-full mt-1.5 z-30 bg-white border border-gray-200 rounded-xl shadow-lg w-64 p-4 flex flex-col gap-4">
                   {/* Prodi — hanya untuk mahasiswa dan dosen */}
                   {tab !== "admin" && (
                     <div className="flex flex-col gap-1.5">

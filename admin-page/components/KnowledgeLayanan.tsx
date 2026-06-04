@@ -174,7 +174,7 @@ export default function KnowledgeLayanan() {
 
       {/* Table */}
       <div className="bg-white rounded-xl shadow-sm border border-[#e8edf5] overflow-hidden">
-        <div className="px-3 py-2 md:px-6 md:py-4 border-b border-gray-100 flex flex-col gap-2">
+        <div className="px-3 py-2 md:px-6 md:py-4 border-b border-gray-100 flex flex-col md:flex-row md:items-center md:justify-between gap-2">
           <h2 className="text-base font-semibold text-gray-700">
             Daftar Knowledge <span className="text-gray-400 font-normal text-sm">({filtered.length} entri)</span>
           </h2>
@@ -207,7 +207,7 @@ export default function KnowledgeLayanan() {
               </button>
 
               {filterOpen && (
-                <div className="absolute left-0 md:left-auto md:right-0 top-full mt-1.5 z-30 bg-white border border-gray-200 rounded-xl shadow-lg w-72 p-4 flex flex-col gap-4">
+                <div className="absolute left-0 top-full mt-1.5 z-30 bg-white border border-gray-200 rounded-xl shadow-lg w-72 p-4 flex flex-col gap-4">
                   {/* Tipe Pengguna */}
                   <div className="flex flex-col gap-1.5">
                     <label className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Tipe Pengguna</label>

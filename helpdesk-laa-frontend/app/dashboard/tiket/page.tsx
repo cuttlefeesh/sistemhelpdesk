@@ -127,6 +127,23 @@ export default function TiketPage() {
     }
   };
 
+  const pollTickets = async () => {
+    try {
+      const res = await fetch("/api/tickets");
+      const result = await res.json();
+      if (result.status === "success" && result.data) {
+        const formatted = result.data.map((t: Ticket & { created_at?: string }) => ({
+          ...t,
+          date: t.created_at
+            ? new Date(t.created_at).toISOString().split("T")[0]
+            : new Date().toISOString().split("T")[0],
+        }));
+        setTickets(formatted);
+        setCache("tickets", formatted);
+      }
+    } catch { /* noop */ }
+  };
+
   const fetchServices = async () => {
     const key = `services_${userRole}`;
     const cached = getCache<Service>(key);
@@ -143,6 +160,26 @@ export default function TiketPage() {
 
   useEffect(() => {
     fetchTickets();
+  }, []);
+
+  useEffect(() => {
+    let interval: ReturnType<typeof setInterval> | null = null;
+    const start = () => { interval = setInterval(pollTickets, 3000); };
+    const stop  = () => { if (interval) { clearInterval(interval); interval = null; } };
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "hidden") stop();
+      else { pollTickets(); start(); }
+    };
+
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    if (document.visibilityState !== "hidden") start();
+
+    return () => {
+      stop();
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {

@@ -40,6 +40,45 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
       .catch(() => {});
   }, []);
 
+  // Update unread badge instan saat ticket list page melakukan poll
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { total } = (e as CustomEvent<{ total: number }>).detail;
+      setUnreadCount(total);
+    };
+    window.addEventListener("tickets-unread-updated", handler);
+    return () => window.removeEventListener("tickets-unread-updated", handler);
+  }, []);
+
+  // Fallback polling mandiri setiap 30s (aktif di semua halaman admin)
+  useEffect(() => {
+    let interval: ReturnType<typeof setInterval> | null = null;
+    const poll = () => {
+      fetch("/api/tickets")
+        .then((r) => r.ok ? r.json() : [])
+        .then((tickets: { unread_count?: number }[]) => {
+          setUnreadCount(tickets.reduce((sum, t) => sum + (t.unread_count ?? 0), 0));
+        })
+        .catch(() => {});
+    };
+
+    const start = () => { interval = setInterval(poll, 30000); };
+    const stop  = () => { if (interval) { clearInterval(interval); interval = null; } };
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "hidden") stop();
+      else { poll(); start(); }
+    };
+
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    if (document.visibilityState !== "hidden") start();
+
+    return () => {
+      stop();
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, []);
+
   // Update nama langsung saat profil disimpan
   useEffect(() => {
     const handler = (e: Event) => {
