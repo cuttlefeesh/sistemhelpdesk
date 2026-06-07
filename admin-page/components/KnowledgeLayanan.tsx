@@ -179,7 +179,7 @@ export default function KnowledgeLayanan() {
             Daftar Knowledge <span className="text-gray-400 font-normal text-sm">({filtered.length} entri)</span>
           </h2>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 md:gap-2">
             {/* Multi-filter dropdown */}
             <div className="relative shrink-0" ref={filterRef}>
               <button
@@ -253,7 +253,7 @@ export default function KnowledgeLayanan() {
             {/* Tambah Data */}
             <button
               onClick={() => { setEditTarget(null); setModalOpen(true); }}
-              className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition whitespace-nowrap"
+              className="flex items-center gap-1.5 md:gap-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium px-3 py-1.5 md:px-4 md:py-2 rounded-lg transition whitespace-nowrap"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />

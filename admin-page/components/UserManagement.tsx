@@ -382,7 +382,7 @@ export default function UserManagement() {
             )}
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 md:gap-2">
             {/* Multi-filter */}
             <div className="relative shrink-0" ref={filterRef}>
               <button
@@ -471,19 +471,19 @@ export default function UserManagement() {
               <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
               </svg>
-              Tambah {tabLabel}
+              Tambah User
             </button>
 
             {/* Dropdown Tambah — mobile only */}
             <div className="relative shrink-0 md:hidden" ref={addMenuRef}>
               <button
                 onClick={() => setAddMenuOpen((p) => !p)}
-                className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium px-4 py-1.5 rounded-lg transition whitespace-nowrap"
+                className="flex items-center gap-1.5 bg-red-600 hover:bg-red-700 text-white text-sm font-medium px-3 py-1.5 rounded-lg transition whitespace-nowrap"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
                 </svg>
-                Tambah {tabLabel}
+                Tambah User
                 <svg xmlns="http://www.w3.org/2000/svg" className={`w-3 h-3 transition-transform ${addMenuOpen ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
                 </svg>
