@@ -53,7 +53,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <UserProvider>
-      <div className="flex h-screen bg-gray-100 font-sans overflow-hidden">
+      <div className="flex h-dvh bg-gray-100 font-sans overflow-hidden">
         {/* Mobile backdrop */}
         {sidebarOpen && (
           <div

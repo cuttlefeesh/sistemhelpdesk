@@ -64,7 +64,7 @@ export default function AkunPage() {
           </div>
 
           {/* Detail */}
-          <div className="px-6 py-4 space-y-4 flex-1">
+          <div className="px-6 py-4 space-y-4 flex-1 overflow-y-auto min-h-0">
             {/* NIM/NIP */}
             <div className="flex items-center justify-between border-b border-gray-100 pb-3">
               <span className="text-sm text-gray-500 font-medium">Username (NIM/NIP)</span>
