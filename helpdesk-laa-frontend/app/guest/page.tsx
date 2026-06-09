@@ -8,6 +8,37 @@ import type { Message } from "@/lib/types";
 
 type Service = { id: number; nama_layanan: string };
 
+const markdownComponents = {
+  a: ({ href, children }: { href?: string; children?: React.ReactNode }) => (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="text-red-600 underline font-medium hover:text-red-800 transition-colors break-all"
+    >
+      {children}
+    </a>
+  ),
+};
+
+// Konversi URL plain-text (dengan atau tanpa https://) ke format Markdown link.
+// Mendukung: https://..., bare domain (kepokape.id), dan domain+path (linktr.ee/laa.fte).
+// Split terlebih dahulu agar link Markdown yang sudah ada tidak di-wrap ulang.
+const autoLinkify = (text: string) =>
+  text
+    .split(/(\[[^\]]*\]\([^)]*\))/g)
+    .map((part, i) => {
+      if (i % 2 === 1) return part; // sudah dalam [...](...)
+      return part.replace(
+        /(?<![/@\w])((?:https?:\/\/)?(?:[a-zA-Z0-9][a-zA-Z0-9-]*\.)+(?:ac\.id|co\.id|go\.id|sch\.id|id|com|net|org|edu|io|ly|ee)(?:\/[^\s<>"')\]]*)?)/gi,
+        (match) => {
+          const href = /^https?:\/\//i.test(match) ? match : `https://${match}`;
+          return `[${match}](${href})`;
+        }
+      );
+    })
+    .join("");
+
 const shuffleAndFilter = (data: Service[]): Service[] =>
   data
     .filter((s) => s.nama_layanan !== "Informasi Dosen")
@@ -178,7 +209,7 @@ function GuestChatContent() {
                   <div className="w-[92%] md:w-[85%] rounded-xl shadow-sm bg-white border border-gray-200 text-gray-800 rounded-bl-none overflow-hidden">
                     <div className="p-4">
                       <div className="space-y-2 [&>ul]:list-disc [&>ul]:pl-5 [&>ol]:list-decimal [&>ol]:pl-5 [&>strong]:font-bold [&>p]:mb-1 [&>p]:whitespace-pre-wrap">
-                        <ReactMarkdown>{msg.content}</ReactMarkdown>
+                        <ReactMarkdown components={markdownComponents}>{autoLinkify(msg.content)}</ReactMarkdown>
                       </div>
                     </div>
                     <div className="border-t border-gray-100">
@@ -212,7 +243,7 @@ function GuestChatContent() {
                       <span className="whitespace-pre-wrap">{msg.content}</span>
                     ) : (
                       <div className="space-y-2 [&>ul]:list-disc [&>ul]:pl-5 [&>ol]:list-decimal [&>ol]:pl-5 [&>strong]:font-bold [&>p]:mb-1 [&>p]:whitespace-pre-wrap">
-                        <ReactMarkdown>{msg.content}</ReactMarkdown>
+                        <ReactMarkdown components={markdownComponents}>{autoLinkify(msg.content)}</ReactMarkdown>
                       </div>
                     )}
                   </div>
