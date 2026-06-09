@@ -107,13 +107,23 @@ export default function GuestSidebar({ isOpen, onClose }: Props) {
                   </a>
                 </li>
                 <li>
-                  <a href="https://lms.telkomuniversity.ac.id/" target="_blank" rel="noopener noreferrer" className="block px-3 py-2 text-gray-600 hover:bg-gray-50 hover:text-red-600 rounded-lg transition">
-                    🔗 CeLOE LMS
+                  <a href="https://toss.telkomuniversity.ac.id/" target="_blank" rel="noopener noreferrer" className="block px-3 py-2 text-gray-600 hover:bg-gray-50 hover:text-red-600 rounded-lg transition">
+                    🔗 TOSS
+                  </a>
+                </li>
+                <li>
+                  <a href="https://kepokape.id/" target="_blank" rel="noopener noreferrer" className="block px-3 py-2 text-gray-600 hover:bg-gray-50 hover:text-red-600 rounded-lg transition">
+                    🔗 KepoKape
+                  </a>
+                </li>
+                <li>
+                  <a href="https://basila.telkomuniversity.ac.id/" target="_blank" rel="noopener noreferrer" className="block px-3 py-2 text-gray-600 hover:bg-gray-50 hover:text-red-600 rounded-lg transition">
+                    🔗 BASILA
                   </a>
                 </li>
                 <li>
                   <a href="https://linktr.ee/laa.fte" target="_blank" rel="noopener noreferrer" className="block px-3 py-2 text-gray-600 hover:bg-gray-50 hover:text-red-600 rounded-lg transition">
-                    🔗 Web Fakultas
+                    🔗 Linktree LAA FTE
                   </a>
                 </li>
               </ul>
