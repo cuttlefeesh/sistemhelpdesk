@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import anime from "animejs";
 import { useToast } from "@/lib/useToast";
 import ToastNotification from "@/components/ToastNotification";
@@ -127,15 +128,149 @@ export default function LoginPage() {
 
   return (
     <>
-      <main className="flex items-center justify-center h-screen bg-gray-50 px-4 relative z-10">
-        <div className="max-w-md w-full bg-white rounded-xl shadow-lg p-8 border border-gray-100">
-          <RobotMascot isFocused={showPassword} />
-          <div className="text-center mb-8">
-            <h1 className="text-2xl font-bold text-red-700 mb-2">Helpdesk LAA FTE</h1>
-            <p className="text-gray-500 text-sm">Silakan login untuk mengakses layanan kami</p>
-          </div>
+      <link rel="preconnect" href="https://fonts.googleapis.com" />
+      <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+      <link
+        href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
+        rel="stylesheet"
+      />
+      <style>{`
+        .hl-root { font-family: 'Plus Jakarta Sans', sans-serif; height: 100vh; display: flex; overflow: hidden; }
+        @keyframes hl-img-in {
+          from { opacity: 0; transform: translateX(-20px); }
+          to   { opacity: 1; transform: translateX(0); }
+        }
+        @keyframes hl-form-in {
+          from { opacity: 0; transform: translateX(30px); }
+          to   { opacity: 1; transform: translateX(0); }
+        }
+        .hl-left  { animation: hl-img-in  0.8s cubic-bezier(0.16,1,0.3,1) both; }
+        .hl-right { animation: hl-form-in 0.7s cubic-bezier(0.16,1,0.3,1) 0.1s both; }
+      `}</style>
 
-          <form onSubmit={handleLogin} className="space-y-6">
+      <main className="hl-root">
+        {/* Left: Building image panel */}
+        <div
+          className="hl-left relative hidden lg:flex flex-col"
+          style={{ width: "55%", flexShrink: 0, overflow: "hidden" }}
+        >
+          <Image
+            src="/gedung-tu.jpg"
+            alt="Gedung Telkom University"
+            fill
+            className="object-cover"
+            priority
+          />
+          {/* Dark gray overlay */}
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              background:
+                "linear-gradient(160deg, rgba(20,20,20,0.55) 0%, rgba(0,0,0,0.2) 50%, rgba(0,0,0,0.72) 100%)",
+            }}
+          />
+          {/* Content over image */}
+          <div
+            style={{
+              position: "relative",
+              zIndex: 1,
+              display: "flex",
+              flexDirection: "column",
+              height: "100%",
+              padding: "48px",
+            }}
+          >
+            {/* Top logo */}
+            <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+              <Image
+                src="/logo-fte.png"
+                alt="FTE"
+                width={64}
+                height={64}
+                className="object-contain"
+                style={{ filter: "drop-shadow(0 2px 8px rgba(0,0,0,0.5))" }}
+              />
+              <div>
+                <p
+                  style={{
+                    color: "#ffffff",
+                    fontSize: "14px",
+                    fontWeight: 700,
+                    lineHeight: 1.2,
+                    textShadow: "0 1px 4px rgba(0,0,0,0.6)",
+                  }}
+                >
+                  Fakultas Teknik Elektro
+                </p>
+                <p style={{ color: "rgba(255,255,255,0.65)", fontSize: "12px", marginTop: "2px" }}>
+                  Telkom University
+                </p>
+              </div>
+            </div>
+
+            {/* Spacer */}
+            <div style={{ flex: 1 }} />
+
+            {/* Bottom content */}
+            <div>
+              <div
+                style={{
+                  width: "48px",
+                  height: "3px",
+                  background: "#ef4444",
+                  borderRadius: "2px",
+                  marginBottom: "20px",
+                }}
+              />
+              <h2
+                style={{
+                  color: "#ffffff",
+                  fontSize: "26px",
+                  fontWeight: 800,
+                  lineHeight: 1.25,
+                  letterSpacing: "-0.02em",
+                  textShadow: "0 2px 16px rgba(0,0,0,0.6)",
+                  marginBottom: "12px",
+                  maxWidth: "360px",
+                }}
+              >
+                Sistem Helpdesk Akademik
+              </h2>
+              <p
+                style={{
+                  color: "rgba(255,255,255,0.62)",
+                  fontSize: "13px",
+                  lineHeight: 1.65,
+                  maxWidth: "320px",
+                }}
+              >
+                Layanan bantuan dan informasi akademik untuk mahasiswa serta dosen Fakultas Teknik Elektro.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Right: Form panel */}
+        <div
+          className="hl-right flex-1 flex flex-col"
+          style={{ background: "#f9fafb", position: "relative" }}
+        >
+          {/* Top accent bar */}
+          <div style={{ height: "5px", background: "linear-gradient(to right, #b91c1c, #ef4444, #b91c1c)" }} />
+
+          <div
+            className="flex-1 flex items-center justify-center px-4 py-3"
+            style={{ minHeight: 0, overflowY: "auto" }}
+          >
+            <div className="max-w-md w-full">
+              <RobotMascot isFocused={showPassword} />
+              <div className="text-center mb-5">
+                <h1 className="text-2xl font-bold text-red-700 mb-2">Helpdesk LAA FTE</h1>
+                <p className="text-gray-500 text-sm">Silakan login untuk mengakses layanan kami</p>
+              </div>
+
+              <form onSubmit={handleLogin} className="space-y-4">
             <div>
               <label htmlFor="nimNip" className="block text-sm font-medium text-gray-700 mb-1">
                 NIM Mahasiswa / NIP Dosen
@@ -208,7 +343,7 @@ export default function LoginPage() {
             </div>
           </form>
 
-          <div className="mt-6 pt-5 border-t border-gray-100 text-center">
+          <div className="mt-4 pt-4 border-t border-gray-100 text-center">
             <p className="text-xs text-gray-400 mb-3">Atau akses tanpa login</p>
             <button
               type="button"
@@ -217,6 +352,8 @@ export default function LoginPage() {
             >
               Lanjutkan sebagai Tamu
             </button>
+          </div>
+            </div>
           </div>
         </div>
       </main>
