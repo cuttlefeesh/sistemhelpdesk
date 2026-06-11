@@ -27,7 +27,7 @@ const CACHE_KEY = "tickets";
 const PAGE_SIZE = 50;
 
 const AGE_OPTIONS = [
-  { value: "",     label: "Semua Umur" },
+  { value: "",     label: "Semua Durasi" },
   { value: "<1h",  label: "< 1 jam" },
   { value: "<1d",  label: "< 1 hari" },
   { value: ">1d",  label: "> 1 hari" },
@@ -398,7 +398,7 @@ export default function TicketPage() {
 
                   {/* Umur tiket */}
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Umur Tiket</label>
+                    <label className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Durasi Tiket</label>
                     <CustomSelect
                       value={filterAge}
                       onChange={(v) => { setFilterAge(v); resetPage(); }}
@@ -498,7 +498,7 @@ export default function TicketPage() {
                 <th className="th-cell">Subjek</th>
                 <th className="th-cell">Deskripsi</th>
                 <th className="th-cell">Tanggal</th>
-                <th className="th-cell">Umur</th>
+                <th className="th-cell">Durasi</th>
                 <th className="th-cell">Status</th>
                 <th className="th-cell">Handled By</th>
                 <th className="th-cell w-10" />
