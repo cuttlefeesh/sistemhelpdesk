@@ -26,7 +26,7 @@ export default function HelpDeskSidebar({ isOpen, onClose }: Props) {
 
   const currentSessionId = searchParams.get("session") ?? "";
 
-  // Fetch / refresh riwayat chat setiap kali pathname/searchParams berubah
+  // Fetch riwayat chat sekali saat sidebar mount (bukan setiap navigasi)
   useEffect(() => {
     if (!pathname.startsWith("/dashboard")) return;
     const cached = getCache<ChatSession>("chat_sessions");
@@ -49,7 +49,23 @@ export default function HelpDeskSidebar({ isOpen, onClose }: Props) {
         }
       })
       .catch(() => {});
-  }, [pathname, searchParams]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Terima sesi chat baru dari chat/page.tsx tanpa refetch network
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { sessionId, title } = (e as CustomEvent<{ sessionId: string; title: string }>).detail;
+      setChatSessions((prev) => {
+        if (prev.some((s) => s.sessionId === sessionId)) return prev;
+        const updated = [{ sessionId, title }, ...prev];
+        setCache("chat_sessions", updated);
+        return updated;
+      });
+    };
+    window.addEventListener("chat-session-created", handler);
+    return () => window.removeEventListener("chat-session-created", handler);
+  }, []);
 
   // Tutup dropdown saat klik luar
   useEffect(() => {

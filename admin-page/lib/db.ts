@@ -10,6 +10,7 @@ types.setTypeParser(1184, (val: string) => new Date(val).toISOString());
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false },
+  keepAlive: true,
 });
 
 export default pool;

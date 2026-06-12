@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { getCache, setCache, invalidateCache } from "@/lib/dataCache";
+import { useAdmin } from "@/lib/AdminContext";
 import Pagination from "@/components/Pagination";
 import CustomSelect from "@/components/CustomSelect";
 
@@ -106,7 +107,7 @@ export default function TicketPage() {
   const [page, setPage] = useState(1);
   const [filterOpen, setFilterOpen] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
-  const [currentAdmin, setCurrentAdmin] = useState<string>("");
+  const { adminId: currentAdmin } = useAdmin();
   const filterRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -138,11 +139,6 @@ export default function TicketPage() {
   };
 
   useEffect(() => {
-    fetch("/api/auth/me")
-      .then((r) => r.json())
-      .then((d) => { if (d.id != null) setCurrentAdmin(String(d.id)); })
-      .catch(() => {});
-
     const cached = getCache<Ticket>(CACHE_KEY);
     if (cached) {
       setTickets(cached);

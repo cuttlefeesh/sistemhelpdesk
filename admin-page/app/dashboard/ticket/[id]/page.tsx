@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { getCache, setCache } from "@/lib/dataCache";
+import { useAdmin } from "@/lib/AdminContext";
 
 type Ticket = {
   id: string;
@@ -115,24 +116,13 @@ export default function TicketDetailPage() {
   const [currentStatus, setCurrentStatus] = useState("");
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [showCloseConfirm, setShowCloseConfirm] = useState(false);
-  const [adminName, setAdminName] = useState("Admin");
-  const [adminId, setAdminId] = useState("");
-  const [adminLoaded, setAdminLoaded] = useState(false);
+  const { adminId: ctxAdminId, adminName: ctxAdminName, isLoadingAdmin } = useAdmin();
+  const adminId = ctxAdminId;
+  const adminName = ctxAdminName || "Admin";
+  const adminLoaded = !isLoadingAdmin;
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-
-  // Get current admin identity
-  useEffect(() => {
-    fetch("/api/auth/me")
-      .then((r) => r.json())
-      .then((d) => {
-        if (d.nama) setAdminName(d.nama);
-        if (d.id != null) setAdminId(String(d.id));
-      })
-      .catch(() => {})
-      .finally(() => setAdminLoaded(true));
-  }, []);
 
   // Load ticket — cache first, then API
   useEffect(() => {

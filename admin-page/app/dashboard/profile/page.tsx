@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Image from "next/image";
+import { useAdmin } from "@/lib/AdminContext";
 
 export default function ProfilePage() {
-  const [profile, setProfile] = useState({ name: "", nip: "" });
+  const { adminName, nimNip, setAdminName, setNimNip } = useAdmin();
   const [editingProfile, setEditingProfile] = useState(false);
   const [profileForm, setProfileForm] = useState({ name: "", nip: "" });
   const [profileSaving, setProfileSaving] = useState(false);
@@ -18,17 +19,8 @@ export default function ProfilePage() {
   const [passwordSaved, setPasswordSaved] = useState(false);
   const [passwordError, setPasswordError] = useState("");
 
-  useEffect(() => {
-    fetch("/api/auth/me")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (data?.nama) setProfile({ name: data.nama, nip: data.nim_nip ?? "" });
-      })
-      .catch(() => {});
-  }, []);
-
   const startEditingProfile = () => {
-    setProfileForm({ name: profile.name, nip: profile.nip });
+    setProfileForm({ name: adminName, nip: nimNip });
     setProfileError("");
     setEditingProfile(true);
   };
@@ -52,7 +44,8 @@ export default function ProfilePage() {
         setProfileError(json.error || "Gagal memperbarui profil.");
         return;
       }
-      setProfile({ name: json.data.nama, nip: json.data.nip });
+      setAdminName(json.data.nama);
+      setNimNip(json.data.nip);
       setEditingProfile(false);
       setProfileSaved(true);
       setTimeout(() => setProfileSaved(false), 3000);
@@ -119,8 +112,8 @@ export default function ProfilePage() {
               />
             </div>
             <div>
-              <p className="text-white font-semibold text-base">{profile.name || "..."}</p>
-              <p className="text-white/60 text-sm">{profile.nip || "..."}</p>
+              <p className="text-white font-semibold text-base">{adminName || "..."}</p>
+              <p className="text-white/60 text-sm">{nimNip || "..."}</p>
             </div>
           </div>
           <div className="px-6 py-3 bg-gray-50 border-t border-gray-100 flex items-center gap-2">
@@ -194,11 +187,11 @@ export default function ProfilePage() {
             <div className="divide-y divide-gray-100">
               <div className="flex items-center justify-between py-3">
                 <span className="text-sm text-gray-500 font-medium">Nama</span>
-                <span className="text-sm font-semibold text-gray-800">{profile.name || "..."}</span>
+                <span className="text-sm font-semibold text-gray-800">{adminName || "..."}</span>
               </div>
               <div className="flex items-center justify-between py-3">
                 <span className="text-sm text-gray-500 font-medium">NIP</span>
-                <span className="text-sm font-semibold text-gray-800 font-mono">{profile.nip || "..."}</span>
+                <span className="text-sm font-semibold text-gray-800 font-mono">{nimNip || "..."}</span>
               </div>
               <div className="flex items-center justify-between py-3">
                 <span className="text-sm text-gray-500 font-medium">Role</span>

@@ -1,5 +1,11 @@
 @import "tailwindcss";
 
+/* Sembunyikan native password toggle dari browser (Edge, Chrome, IE) */
+input[type="password"]::-ms-reveal,
+input[type="password"]::-ms-clear {
+  display: none;
+}
+
 /* ═══════════════════════════════════════════════
    DESIGN TOKENS
 ═══════════════════════════════════════════════ */

@@ -2,8 +2,27 @@ import { NextResponse } from "next/server";
 import pool from "@/lib/db";
 import bcrypt from "bcryptjs";
 import { signToken, cookieName, cookieOptions } from "@/lib/auth";
+import { rateLimit } from "@/lib/rateLimit";
+
+const loginLimiter = rateLimit({ interval: 15 * 60_000, limit: 10 });
+
+function getDeviceKey(request: Request): string {
+  const ip =
+    request.headers.get("x-forwarded-for")?.split(",")[0].trim() ??
+    request.headers.get("x-real-ip") ??
+    "127.0.0.1";
+  const ua = request.headers.get("user-agent") ?? "unknown-ua";
+  return `${ip}:${ua}`;
+}
 
 export async function POST(request: Request) {
+  if (!loginLimiter.check(getDeviceKey(request))) {
+    return NextResponse.json(
+      { error: "Terlalu banyak percobaan login. Coba lagi dalam 15 menit." },
+      { status: 429, headers: { "Retry-After": "900" } },
+    );
+  }
+
   try {
     const { identifier, password } = await request.json();
 
@@ -40,18 +59,20 @@ export async function POST(request: Request) {
     }
 
     const sessionId = crypto.randomUUID();
-    await pool.query(
-      "UPDATE user_admin SET session_id = $1 WHERE nip = $2",
-      [sessionId, admin.nim_nip],
-    );
 
-    const token = await signToken({
-      id: admin.id,
-      nama: admin.nama,
-      nim_nip: admin.nim_nip,
-      role: admin.role,
-      session_id: sessionId,
-    });
+    const [, token] = await Promise.all([
+      pool.query("UPDATE user_admin SET session_id = $1 WHERE nip = $2", [
+        sessionId,
+        admin.nim_nip,
+      ]),
+      signToken({
+        id: admin.id,
+        nama: admin.nama,
+        nim_nip: admin.nim_nip,
+        role: admin.role,
+        session_id: sessionId,
+      }),
+    ]);
 
     const response = NextResponse.json({
       success: true,

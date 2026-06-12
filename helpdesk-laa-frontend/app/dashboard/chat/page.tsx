@@ -213,6 +213,13 @@ function ChatPageContent() {
       // Update URL ke session aktif (hanya jika belum ada di URL) tanpa membuat history baru
       if (!sessionFromUrl) {
         router.replace(`/dashboard/chat?session=${activeSessionId}`);
+        // Beritahu sidebar agar menambahkan sesi baru ini tanpa refetch network
+        const sessionTitle = userContent.length > 25 ? userContent.substring(0, 25) + "..." : userContent;
+        window.dispatchEvent(
+          new CustomEvent("chat-session-created", {
+            detail: { sessionId: activeSessionId, title: sessionTitle },
+          })
+        );
       }
 
       // Kirim ke Python backend

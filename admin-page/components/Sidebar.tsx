@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useState, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { clearAllCache } from "@/lib/dataCache";
+import { useAdmin } from "@/lib/AdminContext";
 
 interface SidebarProps {
   isOpen?: boolean;
@@ -15,7 +16,8 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [kbOpen, setKbOpen] = useState(pathname.startsWith("/dashboard/knowledge-base"));
-  const [adminName, setAdminName] = useState("Admin LAA");
+  const { adminName: ctxAdminName } = useAdmin();
+  const adminName = ctxAdminName || "Admin LAA";
   const [unreadCount, setUnreadCount] = useState(0);
 
   const initials = (adminName || "A")
@@ -26,11 +28,6 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
     .slice(0, 2);
 
   useEffect(() => {
-    fetch("/api/auth/me")
-      .then((r) => r.ok ? r.json() : null)
-      .then((data) => { if (data?.nama) setAdminName(data.nama); })
-      .catch(() => {});
-
     fetch("/api/tickets")
       .then((r) => r.ok ? r.json() : [])
       .then((tickets: { unread_count?: number }[]) => {
@@ -77,16 +74,6 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
       stop();
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };
-  }, []);
-
-  // Update nama langsung saat profil disimpan
-  useEffect(() => {
-    const handler = (e: Event) => {
-      const { nama } = (e as CustomEvent<{ nama: string }>).detail;
-      if (nama) setAdminName(nama);
-    };
-    window.addEventListener("admin-profile-updated", handler);
-    return () => window.removeEventListener("admin-profile-updated", handler);
   }, []);
 
   // Auto-close drawer saat navigasi (mobile)

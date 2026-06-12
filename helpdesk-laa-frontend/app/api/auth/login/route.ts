@@ -2,8 +2,27 @@ import { NextResponse } from "next/server";
 import pool from "@/lib/db";
 import bcrypt from "bcryptjs";
 import { signToken, cookieName, cookieOptions } from "@/lib/auth";
+import { rateLimit } from "@/lib/rateLimit";
+
+const loginLimiter = rateLimit({ interval: 15 * 60_000, limit: 10 });
+
+function getDeviceKey(request: Request): string {
+  const ip =
+    request.headers.get("x-forwarded-for")?.split(",")[0].trim() ??
+    request.headers.get("x-real-ip") ??
+    "127.0.0.1";
+  const ua = request.headers.get("user-agent") ?? "unknown-ua";
+  return `${ip}:${ua}`;
+}
 
 export async function POST(request: Request) {
+  if (!loginLimiter.check(getDeviceKey(request))) {
+    return NextResponse.json(
+      { status: "error", message: "Terlalu banyak percobaan login. Coba lagi dalam 15 menit." },
+      { status: 429, headers: { "Retry-After": "900" } },
+    );
+  }
+
   const { nimNip, password } = await request.json();
 
   if (!nimNip || !password) {
@@ -57,21 +76,23 @@ export async function POST(request: Request) {
     }
 
     const sessionId = crypto.randomUUID();
-    await pool.query(
-      "UPDATE users SET session_id = $1 WHERE nim_nip = $2",
-      [sessionId, user.nim_nip],
-    );
 
-    const token = await signToken({
-      id: user.id,
-      nim_nip: user.nim_nip,
-      nama: user.nama,
-      email: user.email,
-      role: detectedRole,
-      prodi: user.prodi,
-      kelas: user.kelas,
-      session_id: sessionId,
-    });
+    const [, token] = await Promise.all([
+      pool.query("UPDATE users SET session_id = $1 WHERE nim_nip = $2", [
+        sessionId,
+        user.nim_nip,
+      ]),
+      signToken({
+        id: user.id,
+        nim_nip: user.nim_nip,
+        nama: user.nama,
+        email: user.email,
+        role: detectedRole,
+        prodi: user.prodi,
+        kelas: user.kelas,
+        session_id: sessionId,
+      }),
+    ]);
 
     const response = NextResponse.json({
       status: "success",
