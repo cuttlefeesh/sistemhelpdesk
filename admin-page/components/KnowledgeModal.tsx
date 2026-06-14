@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import CustomSelect, { SelectOption, SelectGroup } from "@/components/CustomSelect";
+import CustomSelect from "@/components/CustomSelect";
+import { normalize, findSimilar } from "@/lib/similarity";
 
 export type KnowledgeEntry = {
   id: number;
@@ -58,6 +59,10 @@ export default function KnowledgeModal({ entry, onClose, onSave, existingEntries
   const [form, setForm] = useState<KnowledgeFormData>(EMPTY);
   const [error, setError] = useState("");
   const [layananOptions, setLayananOptions] = useState<{ id: number; nama_layanan: string; tipe_pengguna: string }[]>([]);
+  const [showIntentSuggestions, setShowIntentSuggestions] = useState(false);
+  const [similarMatches, setSimilarMatches] = useState<{ id: number; nama_layanan: string }[]>([]);
+  const [addLayananError, setAddLayananError] = useState("");
+  const [savingLayanan, setSavingLayanan] = useState(false);
 
   useEffect(() => {
     fetch("/api/layanan-master")
@@ -79,6 +84,9 @@ export default function KnowledgeModal({ entry, onClose, onSave, existingEntries
     } else {
       setForm(EMPTY);
     }
+    setShowIntentSuggestions(false);
+    setSimilarMatches([]);
+    setAddLayananError("");
   }, [entry]);
 
   const set = (key: keyof KnowledgeFormData, value: string) =>
@@ -137,11 +145,67 @@ export default function KnowledgeModal({ entry, onClose, onSave, existingEntries
       )
     : layananOptions.filter(o => !usedIntents.has(o.nama_layanan));
 
-  const handleTipeLayananChange = (value: string) =>
-    setForm((prev) => ({ ...prev, tipe_layanan: value, intent: "" }));
+  const normalizedIntent = normalize(form.intent);
+  const intentSuggestions = filteredLayananOptions.filter((o) =>
+    normalize(o.nama_layanan).includes(normalizedIntent)
+  );
+  const exactMasterMatch = layananOptions.find(
+    (o) => o.tipe_pengguna === form.tipe_pengguna && normalize(o.nama_layanan) === normalizedIntent
+  );
+  const isNewLayanan = form.intent.trim() !== "" && !exactMasterMatch && form.tipe_pengguna !== "";
+  const liveSimilar = isNewLayanan
+    ? findSimilar(form.intent, layananOptions.filter((o) => o.tipe_pengguna === form.tipe_pengguna), (o) => o.nama_layanan)
+    : [];
 
-  const handleTipePenggunaChange = (value: string) =>
+  const handleTipeLayananChange = (value: string) => {
+    setForm((prev) => ({ ...prev, tipe_layanan: value, intent: "" }));
+    setShowIntentSuggestions(false);
+    setSimilarMatches([]);
+    setAddLayananError("");
+  };
+
+  const handleTipePenggunaChange = (value: string) => {
     setForm((prev) => ({ ...prev, tipe_pengguna: value, intent: "" }));
+    setShowIntentSuggestions(false);
+    setSimilarMatches([]);
+    setAddLayananError("");
+  };
+
+  const submitNewLayanan = async (force = false) => {
+    const name = form.intent.trim();
+    if (!name) {
+      setAddLayananError("Nama layanan wajib diisi.");
+      return;
+    }
+    setSavingLayanan(true);
+    setAddLayananError("");
+    try {
+      const res = await fetch("/api/layanan-master", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nama_layanan: name, tipe_pengguna: form.tipe_pengguna, force }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (res.ok) {
+        setLayananOptions((prev) => [...prev, json]);
+        set("intent", json.nama_layanan);
+        setShowIntentSuggestions(false);
+        setSimilarMatches([]);
+        return;
+      }
+      if (json.error === "similar_found") {
+        setSimilarMatches(json.similar ?? []);
+        return;
+      }
+      setSimilarMatches([]);
+      setAddLayananError(json.error || "Gagal menambah layanan.");
+    } catch {
+      setSimilarMatches([]);
+      setAddLayananError("Gagal menambah layanan. Coba lagi.");
+    } finally {
+      setSavingLayanan(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
@@ -204,22 +268,123 @@ export default function KnowledgeModal({ entry, onClose, onSave, existingEntries
                           className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 placeholder-gray-400 outline-none focus:ring-2 focus:ring-red-300 transition"
                         />
                       ) : (
-                        <CustomSelect
-                          value={form.intent}
-                          onChange={(v) => set("intent", v)}
-                          size="sm"
-                          placeholder="-- Pilih Layanan --"
-                          options={form.tipe_pengguna
-                            ? [{ value: "", label: "-- Pilih Layanan --" }, ...filteredLayananOptions.map((o) => ({ value: o.nama_layanan, label: o.nama_layanan }))]
-                            : undefined}
-                          groups={!form.tipe_pengguna
-                            ? (["Mahasiswa", "Dosen"] as const).reduce<SelectGroup[]>((acc, tipe) => {
-                                const opts = layananOptions.filter((o) => o.tipe_pengguna === tipe);
-                                if (opts.length > 0) acc.push({ label: `Layanan ${tipe}`, options: opts.map((o): SelectOption => ({ value: o.nama_layanan, label: o.nama_layanan })) });
-                                return acc;
-                              }, [])
-                            : undefined}
-                        />
+                        <>
+                          <div className="relative">
+                            <input
+                              type="text"
+                              value={form.intent}
+                              onChange={(e) => {
+                                set("intent", e.target.value);
+                                setShowIntentSuggestions(true);
+                                setSimilarMatches([]);
+                                setAddLayananError("");
+                              }}
+                              onFocus={() => setShowIntentSuggestions(true)}
+                              onBlur={() => setTimeout(() => setShowIntentSuggestions(false), 150)}
+                              onKeyDown={(e) => { if (e.key === "Enter") e.preventDefault(); }}
+                              placeholder="Cari atau ketik nama layanan..."
+                              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 placeholder-gray-400 outline-none focus:ring-2 focus:ring-red-300 transition"
+                            />
+                            {showIntentSuggestions && (
+                              <div className="absolute z-50 top-full mt-1 w-full max-h-52 overflow-y-auto bg-white border border-gray-200 rounded-xl shadow-lg">
+                                {form.tipe_pengguna ? (
+                                  <>
+                                    {intentSuggestions.map((o) => (
+                                      <button
+                                        key={o.id}
+                                        type="button"
+                                        onMouseDown={(e) => e.preventDefault()}
+                                        onClick={() => { set("intent", o.nama_layanan); setShowIntentSuggestions(false); }}
+                                        className="w-full text-left px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 hover:text-gray-800 transition"
+                                      >
+                                        {o.nama_layanan}
+                                      </button>
+                                    ))}
+                                    {isNewLayanan && (
+                                      <button
+                                        type="button"
+                                        onMouseDown={(e) => e.preventDefault()}
+                                        onClick={() => submitNewLayanan(false)}
+                                        disabled={savingLayanan}
+                                        className="w-full text-left px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-50 transition"
+                                      >
+                                        {savingLayanan ? "Menyimpan..." : `+ Tambah "${form.intent.trim()}" sebagai layanan baru`}
+                                      </button>
+                                    )}
+                                    {intentSuggestions.length === 0 && !isNewLayanan && (
+                                      <p className="px-3 py-2 text-xs text-gray-400">
+                                        {exactMasterMatch
+                                          ? "Layanan ini sudah digunakan sebagai Intent untuk kombinasi Tipe Pengguna & Tipe Layanan ini."
+                                          : "Tidak ada layanan tersedia."}
+                                      </p>
+                                    )}
+                                  </>
+                                ) : (
+                                  <>
+                                    {(["Mahasiswa", "Dosen"] as const).map((tipe) => {
+                                      const opts = intentSuggestions.filter((o) => o.tipe_pengguna === tipe);
+                                      if (opts.length === 0) return null;
+                                      return (
+                                        <div key={tipe}>
+                                          <div className="px-3 py-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider bg-gray-50 border-b border-gray-100">
+                                            {`Layanan ${tipe}`}
+                                          </div>
+                                          {opts.map((o) => (
+                                            <button
+                                              key={o.id}
+                                              type="button"
+                                              onMouseDown={(e) => e.preventDefault()}
+                                              onClick={() => { set("intent", o.nama_layanan); setShowIntentSuggestions(false); }}
+                                              className="w-full text-left px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 hover:text-gray-800 transition"
+                                            >
+                                              {o.nama_layanan}
+                                            </button>
+                                          ))}
+                                        </div>
+                                      );
+                                    })}
+                                    {intentSuggestions.length === 0 && (
+                                      <p className="px-3 py-2 text-xs text-gray-400">Tidak ada layanan tersedia.</p>
+                                    )}
+                                  </>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                          {!form.tipe_pengguna && (
+                            <p className="text-xs text-gray-400">Pilih Tipe Pengguna untuk menambahkan layanan baru.</p>
+                          )}
+                          {liveSimilar.length > 0 && similarMatches.length === 0 && (
+                            <p className="text-xs text-amber-600">
+                              Mirip dengan layanan yang sudah ada: {liveSimilar.map((m) => `"${m.nama_layanan}"`).join(", ")}.
+                            </p>
+                          )}
+                          {addLayananError && <p className="text-red-500 text-xs">{addLayananError}</p>}
+                          {similarMatches.length > 0 && (
+                            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-2 flex flex-col gap-1.5">
+                              <p className="text-xs text-yellow-700">
+                                Ditemukan layanan dengan nama serupa: {similarMatches.map((m) => `"${m.nama_layanan}"`).join(", ")}.
+                              </p>
+                              <div className="flex gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => submitNewLayanan(true)}
+                                  disabled={savingLayanan}
+                                  className="text-xs font-medium text-yellow-700 border border-yellow-300 rounded-lg px-2.5 py-1 hover:bg-yellow-100 disabled:opacity-50 transition"
+                                >
+                                  Tetap Tambahkan
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setSimilarMatches([])}
+                                  className="text-xs font-medium text-gray-500 hover:text-gray-700 transition"
+                                >
+                                  Ubah Nama
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </>
                       )}
                     </div>
                     {/* Deskripsi */}
