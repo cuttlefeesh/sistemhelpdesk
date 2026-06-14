@@ -28,6 +28,14 @@ export async function proxy(request: NextRequest) {
       allowed = resetLimiter.check(ip);
     } else if (pathname === "/api/guest/chat-bot") {
       allowed = guestChatLimiter.check(ip);
+    } else if (pathname.startsWith("/api/chat") || pathname.startsWith("/api/tickets")) {
+      // TEMPORARY (load testing, revert setelah selesai): generalLimiter
+      // (60 req/menit per IP) membuat seluruh trafik /api/chat & /api/tickets
+      // dari satu mesin k6 (semua VU tampak sebagai 1 IP di Vercel) berbagi
+      // satu kuota 60/menit -- 429 muncul pada >~2 VU tersambung, bukan
+      // mencerminkan kapasitas backend. Dilewatkan sementara agar kapasitas
+      // backend/DB yang sebenarnya bisa diukur.
+      allowed = true;
     } else {
       allowed = generalLimiter.check(ip);
     }
