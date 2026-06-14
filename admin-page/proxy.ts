@@ -3,8 +3,11 @@ import type { NextRequest } from "next/server";
 import { verifyToken, cookieName } from "@/lib/auth";
 import { rateLimit } from "@/lib/rateLimit";
 
-const loginLimiter = rateLimit({ interval: 15 * 60_000, limit: 10 });
-const generalLimiter = rateLimit({ interval: 60_000, limit: 60 });
+// Login: backstop per-IP. Cek per-akun (lebih ketat) dilakukan di route handler.
+const loginLimiterIP = rateLimit({ interval: 15 * 60_000, limit: 120 });
+// General API: per-user (nim_nip dari sesi JWT) untuk yang sudah login, fallback per-IP untuk yang belum.
+const generalUserLimiter = rateLimit({ interval: 60_000, limit: 60 });
+const generalIPLimiter = rateLimit({ interval: 60_000, limit: 60 });
 
 function getIP(req: NextRequest): string {
   return (
@@ -20,8 +23,17 @@ export async function proxy(request: NextRequest) {
   // Rate limiting untuk semua API route
   if (pathname.startsWith("/api/")) {
     const ip = getIP(request);
-    const limiter = pathname === "/api/auth/login" ? loginLimiter : generalLimiter;
-    if (!limiter.check(ip)) {
+    let allowed: boolean;
+    if (pathname === "/api/auth/login") {
+      allowed = loginLimiterIP.check(ip);
+    } else {
+      const token = request.cookies.get(cookieName())?.value;
+      const session = token ? await verifyToken(token) : null;
+      allowed = session?.nim_nip
+        ? generalUserLimiter.check(session.nim_nip)
+        : generalIPLimiter.check(ip);
+    }
+    if (!allowed) {
       return NextResponse.json(
         { error: "Terlalu banyak permintaan. Coba lagi sebentar lagi." },
         {

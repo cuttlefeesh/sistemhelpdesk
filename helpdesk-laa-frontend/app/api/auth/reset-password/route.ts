@@ -2,10 +2,31 @@ import { NextResponse } from "next/server";
 import pool from "@/lib/db";
 import crypto from "crypto";
 import nodemailer from "nodemailer";
+import { rateLimit } from "@/lib/rateLimit";
+
+// Per-akun (NIM/NIP): 3x / jam
+const resetLimiter = rateLimit({ interval: 60 * 60_000, limit: 3 });
 
 export async function POST(request: Request) {
   try {
     const { nimNip } = await request.json(); // Sekarang hanya butuh NIM/NIP
+
+    if (!nimNip) {
+      return NextResponse.json(
+        { status: "error", message: "NIM/NIP wajib diisi" },
+        { status: 400 },
+      );
+    }
+
+    if (!resetLimiter.check(String(nimNip).trim())) {
+      return NextResponse.json(
+        {
+          status: "error",
+          message: "Terlalu banyak permintaan reset password untuk akun ini. Coba lagi dalam 1 jam.",
+        },
+        { status: 429, headers: { "Retry-After": "3600" } },
+      );
+    }
 
     // 1. Cari user dan emailnya di database
     const userResult = await pool.query(

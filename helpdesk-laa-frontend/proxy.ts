@@ -2,10 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyToken, cookieName } from "@/lib/auth";
 import { rateLimit } from "@/lib/rateLimit";
 
-const loginLimiter = rateLimit({ interval: 15 * 60_000, limit: 10 });
-const resetLimiter = rateLimit({ interval: 60 * 60_000, limit: 5 });
-const guestChatLimiter = rateLimit({ interval: 60 * 60_000, limit: 10 });
-const generalLimiter = rateLimit({ interval: 60_000, limit: 60 });
+// Login & reset password: backstop per-IP. Cek per-akun (lebih ketat) dilakukan di route handler.
+const loginLimiterIP = rateLimit({ interval: 15 * 60_000, limit: 120 });
+const resetLimiterIP = rateLimit({ interval: 60 * 60_000, limit: 50 });
+// Guest chat: backstop per-IP. Cek per-guest-id (lebih ketat) dilakukan di route handler.
+const guestChatLimiterIP = rateLimit({ interval: 60 * 60_000, limit: 250 });
+// General API: per-user (nim_nip dari sesi JWT) untuk yang sudah login, fallback per-IP untuk yang belum.
+const generalUserLimiter = rateLimit({ interval: 60_000, limit: 60 });
+const generalIPLimiter = rateLimit({ interval: 60_000, limit: 60 });
 
 function getIP(req: NextRequest): string {
   return (
@@ -23,21 +27,17 @@ export async function proxy(request: NextRequest) {
   if (pathname.startsWith("/api/")) {
     let allowed = true;
     if (pathname === "/api/auth/login") {
-      allowed = loginLimiter.check(ip);
+      allowed = loginLimiterIP.check(ip);
     } else if (pathname === "/api/auth/reset-password") {
-      allowed = resetLimiter.check(ip);
+      allowed = resetLimiterIP.check(ip);
     } else if (pathname === "/api/guest/chat-bot") {
-      allowed = guestChatLimiter.check(ip);
-    } else if (pathname.startsWith("/api/chat") || pathname.startsWith("/api/tickets")) {
-      // TEMPORARY (load testing, revert setelah selesai): generalLimiter
-      // (60 req/menit per IP) membuat seluruh trafik /api/chat & /api/tickets
-      // dari satu mesin k6 (semua VU tampak sebagai 1 IP di Vercel) berbagi
-      // satu kuota 60/menit -- 429 muncul pada >~2 VU tersambung, bukan
-      // mencerminkan kapasitas backend. Dilewatkan sementara agar kapasitas
-      // backend/DB yang sebenarnya bisa diukur.
-      allowed = true;
+      allowed = guestChatLimiterIP.check(ip);
     } else {
-      allowed = generalLimiter.check(ip);
+      const token = request.cookies.get(cookieName())?.value;
+      const session = token ? await verifyToken(token) : null;
+      allowed = session?.nim_nip
+        ? generalUserLimiter.check(session.nim_nip)
+        : generalIPLimiter.check(ip);
     }
     if (!allowed) {
       const isGuestChat = pathname === "/api/guest/chat-bot";
@@ -45,12 +45,17 @@ export async function proxy(request: NextRequest) {
         {
           status: "error",
           message: isGuestChat
-            ? "Batas 10 pesan per jam untuk pengguna tamu telah tercapai. Silakan login untuk pesan tidak terbatas."
+            ? "Terlalu banyak permintaan dari jaringan ini. Coba lagi nanti."
             : "Terlalu banyak permintaan. Coba lagi sebentar lagi.",
         },
         {
           status: 429,
-          headers: pathname === "/api/auth/login" ? { "Retry-After": "900" } : isGuestChat ? { "Retry-After": "3600" } : {},
+          headers:
+            pathname === "/api/auth/login"
+              ? { "Retry-After": "900" }
+              : pathname === "/api/auth/reset-password" || isGuestChat
+                ? { "Retry-After": "3600" }
+                : {},
         },
       );
     }

@@ -1,4 +1,5 @@
 import os
+import asyncio
 from dotenv import load_dotenv
 
 # api_chatbot.py
@@ -26,6 +27,9 @@ app = FastAPI()
 limiter = Limiter(key_func=get_remote_address)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# Hanya 1 request chat yang diproses Ollama secara bersamaan (panggilan sync & blocking)
+chat_lock = asyncio.Lock()
 
 # Mengizinkan Next.js (frontend) untuk memanggil API ini
 # CORS_ORIGINS: comma-separated list URL produksi, e.g. "https://app.vercel.app,https://admin.vercel.app"
@@ -212,8 +216,18 @@ class ChatRequest(BaseModel):
 
 # --- ENDPOINT UTAMA CHATBOT ---
 @app.post("/api/chat-bot")
-@limiter.limit("20/minute")
+@limiter.limit("5/minute")
 async def process_chat(req: ChatRequest, request: Request):
+    if chat_lock.locked():
+        raise HTTPException(
+            status_code=503,
+            detail="Sistem sedang memproses permintaan lain. Silakan coba lagi dalam beberapa saat.",
+        )
+    async with chat_lock:
+        return await _generate_chat_response(req)
+
+
+async def _generate_chat_response(req: ChatRequest):
     injection_filter = PromptInjectionFilter()
     raw_prompt = req.query
     

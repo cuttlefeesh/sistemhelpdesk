@@ -4,25 +4,10 @@ import bcrypt from "bcryptjs";
 import { signToken, cookieName, cookieOptions } from "@/lib/auth";
 import { rateLimit } from "@/lib/rateLimit";
 
-const loginLimiter = rateLimit({ interval: 15 * 60_000, limit: 10 });
-
-function getDeviceKey(request: Request): string {
-  const ip =
-    request.headers.get("x-forwarded-for")?.split(",")[0].trim() ??
-    request.headers.get("x-real-ip") ??
-    "127.0.0.1";
-  const ua = request.headers.get("user-agent") ?? "unknown-ua";
-  return `${ip}:${ua}`;
-}
+// Per-akun (NIM/NIP): 5x / 15 menit — mencegah brute-force satu akun
+const loginLimiter = rateLimit({ interval: 15 * 60_000, limit: 5 });
 
 export async function POST(request: Request) {
-  if (!loginLimiter.check(getDeviceKey(request))) {
-    return NextResponse.json(
-      { status: "error", message: "Terlalu banyak percobaan login. Coba lagi dalam 15 menit." },
-      { status: 429, headers: { "Retry-After": "900" } },
-    );
-  }
-
   const { nimNip, password } = await request.json();
 
   if (!nimNip || !password) {
@@ -31,6 +16,14 @@ export async function POST(request: Request) {
       { status: 400 },
     );
   }
+
+  if (!loginLimiter.check(String(nimNip).trim())) {
+    return NextResponse.json(
+      { status: "error", message: "Terlalu banyak percobaan login untuk akun ini. Coba lagi dalam 15 menit." },
+      { status: 429, headers: { "Retry-After": "900" } },
+    );
+  }
+
   if (typeof password !== "string" || password.length < 6) {
     return NextResponse.json(
       { status: "error", message: "Password minimal 6 karakter" },
