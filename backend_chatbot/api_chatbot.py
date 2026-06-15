@@ -359,7 +359,7 @@ ATURAN PENTING UNTUK MENJAWAB:
 5. KLARIFIKASI UNTUK PERTANYAAN AMBIGU/SINGKAT: Jika pertanyaan pengguna singkat, generik, berupa satu kata, singkatan (misal "SK", "TA", "ujian", "ruangan"), atau tidak jelas maksudnya, JANGAN langsung menjawab tidak ditemukan. Periksa KONTEKS:
    - Jika KONTEKS memuat BEBERAPA entri yang sama-sama relevan dengan kata kunci tersebut tetapi mengarah ke layanan/topik yang BERBEDA, JANGAN pilih salah satu secara sepihak. Sebutkan secara singkat opsi-opsi layanan/topik yang mungkin dimaksud (berdasarkan field 'intent' atau judul layanan di konteks), lalu tanyakan kepada pengguna layanan/topik mana yang dimaksud.
    - Jika KONTEKS memuat HANYA SATU entri yang jelas relevan, jawab langsung berdasarkan entri tersebut seperti biasa (jangan minta klarifikasi jika tidak perlu).
-6. STRICT NOT FOUND & PERTANYAAN TIDAK JELAS: Jika KONTEKS benar-benar tidak relevan/kosong DAN pertanyaan pengguna terlalu singkat/umum untuk dipahami (misal hanya "tolong", "info dong", "itu gimana ya"), JANGAN menjawab datar "Mohon maaf, informasi tersebut tidak tersedia dalam sistem kami." tanpa konteks tambahan. Sebagai gantinya, jawab dengan ramah bahwa pertanyaan kurang jelas dan minta pengguna menjelaskan layanan/topik apa yang ingin ditanyakan, contoh: "Mohon maaf, pertanyaan Anda kurang jelas bagi saya. Bisa tolong jelaskan lebih detail layanan atau topik apa yang ingin Anda tanyakan?" Gunakan kalimat "Mohon maaf, informasi tersebut tidak tersedia dalam sistem kami." HANYA jika pertanyaan pengguna sudah JELAS dan SPESIFIK namun memang tidak ada datanya di KONTEKS.
+6. STRICT NOT FOUND & PERTANYAAN TIDAK JELAS: Jika KONTEKS benar-benar tidak relevan/kosong DAN pertanyaan pengguna terlalu singkat/umum untuk dipahami (misal hanya "tolong", "info dong", "itu gimana ya"), JANGAN menjawab datar "Mohon maaf, informasi tersebut tidak tersedia dalam sistem kami." tanpa konteks tambahan. Sebagai gantinya, jawab dengan ramah bahwa pertanyaan kurang jelas dan minta pengguna menjelaskan layanan/topik apa yang ingin ditanyakan, contoh: "Mohon maaf, agar saya dapat merespons dengan akurat, bisa bantu jelaskan lebih detail mengenai pertanyaan Anda?" Gunakan kalimat "Mohon maaf, informasi tersebut tidak tersedia dalam sistem kami." HANYA jika pertanyaan pengguna sudah JELAS dan SPESIFIK namun memang tidak ada datanya di KONTEKS.
 7. FORMAT TERSTRUKTUR & RAPI menggunakan Markdown.
 8. LAYANAN REFERRAL: Jika konteks mengandung entri dengan 'tipe_layanan': 'Referral', JANGAN katakan tidak ditemukan. Jelaskan bahwa layanan tersebut bukan tanggung jawab LAA FTE, berikan informasi singkat dari field 'deskripsi', lalu arahkan pengguna ke 'unit_pengelola' dan 'kontak_referral' yang ada di konteks.
 9. BAHASA: JANGAN pernah menyebut kata 'database' dalam jawaban. Ketika menjelaskan keterbatasan LAA, gunakan kalimat: "LAA FTE hanya menangani layanan administrasi akademik FTE Telkom University & informasi dosen." — JANGAN sebutkan "data dosen" sebagai satu-satunya layanan LAA.
@@ -368,6 +368,10 @@ ATURAN PENTING UNTUK MENJAWAB:
    - JIKA pertanyaan di luar cakupan LAA/Referral (pertanyaan umum, teknologi, gaya hidup, dll): JANGAN sertakan "[ESKALASI]", cukup jawab bahwa pertanyaan tersebut di luar layanan LAA FTE.
 11. RIWAYAT PERCAKAPAN: Jika pesan pengguna adalah koreksi, klarifikasi, atau pertanyaan lanjutan yang merujuk langsung pada jawaban sebelumnya (contoh: "kok bapak", "bukan itu", "maksudnya yang tadi", "harusnya ibu"), GUNAKAN riwayat percakapan yang tersedia untuk menjawab dengan tepat. Jangan abaikan informasi yang sudah ada di riwayat chat hanya karena konteks database tidak mengandung data baru.
 12. IDENTITAS DIRI: Jika pengguna menanyakan tentang dirinya sendiri (misal "siapa saya", "siapa nama saya", "NIM/NIP saya berapa", "saya kuliah di prodi/kelas apa", "role/peran saya apa"), jawab HANYA berdasarkan "IDENTITAS PENGGUNA YANG SEDANG LOGIN". JANGAN gunakan atau campur dengan data pada "[Data Pengguna]" untuk menjawab pertanyaan jenis ini.
+13. KONFIRMASI ATAS PERTANYAAN KLARIFIKASI BOT: Jika pesan pengguna saat ini adalah AFIRMASI/KONFIRMASI singkat (misal "iya", "ya", "benar", "betul", "iya benar", "ya itu", "oke", "betul itu") DAN balasan BOT sebelumnya pada riwayat percakapan berupa PERTANYAAN KLARIFIKASI yang menawarkan satu/beberapa kemungkinan layanan atau topik, maka:
+   - JANGAN terapkan aturan #6 (jangan anggap ini "pertanyaan kurang jelas" dan jangan minta klarifikasi lagi).
+   - Anggap pengguna mengonfirmasi topik/layanan yang DITAWARKAN BOT pada balasan sebelumnya.
+   - Jawab pertanyaan ASLI pengguna (dari riwayat percakapan) untuk topik yang dikonfirmasi tersebut, menggunakan KONTEKS DATABASE dan/atau informasi yang sudah disebutkan BOT pada balasan sebelumnya.
 
 KONTEKS DATABASE:
 {context}
@@ -403,7 +407,7 @@ KONTEKS DATABASE:
     
     try:
         # Panggil ollama tanpa stream agar mudah diterima frontend
-        response = ollama_client.chat(model=LLM_MODEL, messages=messages, stream=False, options={"num_ctx": 2048})
+        response = ollama_client.chat(model=LLM_MODEL, messages=messages, stream=False, options={"num_ctx": 4096})
         response_text = response['message']['content']
 
         ESCALATION_MARKER = "[ESKALASI]"
