@@ -221,7 +221,7 @@ class ChatRequest(BaseModel):
 
 # --- ENDPOINT UTAMA CHATBOT ---
 @app.post("/api/chat-bot")
-@limiter.limit("5/minute")
+@limiter.limit("30/minute")
 async def process_chat(req: ChatRequest, request: Request):
     if chat_lock.locked():
         raise HTTPException(

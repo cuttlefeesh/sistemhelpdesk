@@ -239,7 +239,14 @@ function ChatPageContent() {
       });
 
       const data = await response.json();
-      const botContent = data.output || "Maaf, saya sedang tidak bisa memproses permintaan Anda.";
+      let botContent: string;
+      if (response.status === 429) {
+        botContent = "Terlalu banyak permintaan dalam waktu singkat. Mohon tunggu beberapa saat sebelum mengirim pertanyaan lagi.";
+      } else if (response.status === 503) {
+        botContent = data.detail || "Sistem sedang memproses permintaan lain. Silakan coba lagi dalam beberapa saat.";
+      } else {
+        botContent = data.output || "Maaf, saya sedang tidak bisa memproses permintaan Anda.";
+      }
       setSuggestTicket(data.suggest_ticket === true);
       await saveBotReply(botContent, activeSessionId);
     } catch {
