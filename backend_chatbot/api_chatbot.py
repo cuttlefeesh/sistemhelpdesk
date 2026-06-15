@@ -213,6 +213,11 @@ class ChatRequest(BaseModel):
     query: str
     user_mode: str # "Mahasiswa" atau "Dosen" (berasal dari userRole Next.js)
     history: list[ChatMessage] = []
+    nama: str | None = None
+    nim_nip: str | None = None
+    prodi: str | None = None
+    kelas: str | None = None
+    kode_dosen: str | None = None
 
 # --- ENDPOINT UTAMA CHATBOT ---
 @app.post("/api/chat-bot")
@@ -286,7 +291,31 @@ async def _generate_chat_response(req: ChatRequest):
         task="memberikan informasi berdasarkan KONTEKS yang disediakan dan riwayat percakapan yang relevan"
     )
 
+    # Identitas akun yang sedang login (dikirim terverifikasi dari session Next.js)
+    identity_lines = []
+    if req.nama:
+        identity_lines.append(f"- Nama: {req.nama}")
+    if req.nim_nip:
+        identity_lines.append(f"- {'NIP' if safe_role == 'dosen' else 'NIM'}: {req.nim_nip}")
+    if safe_role == "mahasiswa":
+        if req.prodi:
+            identity_lines.append(f"- Program Studi: {req.prodi}")
+        if req.kelas:
+            identity_lines.append(f"- Kelas: {req.kelas}")
+    else:
+        if req.kode_dosen:
+            identity_lines.append(f"- Kode Dosen: {req.kode_dosen}")
+        if req.prodi:
+            identity_lines.append(f"- Program Studi: {req.prodi}")
+    identity_block = "\n".join(identity_lines) if identity_lines else "(Tidak ada data identitas pengguna yang tersedia — kemungkinan pengguna belum login/guest)"
+
     full_system_instructions = f"""{base_security_prompt}
+
+IDENTITAS PENGGUNA YANG SEDANG LOGIN (gunakan ini untuk menjawab pertanyaan tentang diri pengguna sendiri, seperti "siapa saya", "siapa nama saya", "NIM/NIP saya berapa", "saya prodi/kelas apa", "role saya apa", dll):
+- Role: {req.user_mode}
+{identity_block}
+
+PENTING: Bagian "[Data Pengguna]" pada KONTEKS DATABASE di bawah (jika ada) adalah HASIL PENCARIAN tentang pengguna LAIN di sistem (misalnya data dosen yang relevan dengan pertanyaan mahasiswa, atau data mahasiswa lain), BUKAN data diri pengguna yang sedang chat. JANGAN PERNAH menganggap salah satu entri "[Data Pengguna]" sebagai identitas, peran, atau profil pengguna yang sedang chat — gunakan HANYA bagian "IDENTITAS PENGGUNA YANG SEDANG LOGIN" di atas untuk pertanyaan semacam itu.
 
 Informasi Kontak LAA FTE (HANYA gunakan format ini jika user secara eksplisit bertanya tentang kontak/lokasi LAA, ATAU jika informasi tidak tersedia dan perlu eskalasi — JANGAN sertakan di setiap jawaban):
 Jika Anda membutuhkan informasi kontak LAA FTE, Anda bisa hubungi kami melalui:
@@ -311,6 +340,7 @@ ATURAN PENTING UNTUK MENJAWAB:
    - HANYA jika pertanyaan JELAS berkaitan dengan layanan LAA (ada entri relevan di konteks dengan tipe_layanan='LAA') DAN informasi tidak tersedia atau membutuhkan penanganan langsung admin: tambahkan teks "[ESKALASI]" di AWAL jawaban (sebelum kalimat lainnya), lalu sarankan membuat tiket: "Untuk mendapatkan penanganan lebih lanjut, silakan buat tiket melalui menu **Tiket** di dashboard Anda."
    - JIKA pertanyaan di luar cakupan LAA/Referral (pertanyaan umum, teknologi, gaya hidup, dll): JANGAN sertakan "[ESKALASI]", cukup jawab bahwa pertanyaan tersebut di luar layanan LAA FTE.
 11. RIWAYAT PERCAKAPAN: Jika pesan pengguna adalah koreksi, klarifikasi, atau pertanyaan lanjutan yang merujuk langsung pada jawaban sebelumnya (contoh: "kok bapak", "bukan itu", "maksudnya yang tadi", "harusnya ibu"), GUNAKAN riwayat percakapan yang tersedia untuk menjawab dengan tepat. Jangan abaikan informasi yang sudah ada di riwayat chat hanya karena konteks database tidak mengandung data baru.
+12. IDENTITAS DIRI: Jika pengguna menanyakan tentang dirinya sendiri (misal "siapa saya", "siapa nama saya", "NIM/NIP saya berapa", "saya kuliah di prodi/kelas apa", "role/peran saya apa"), jawab HANYA berdasarkan "IDENTITAS PENGGUNA YANG SEDANG LOGIN". JANGAN gunakan atau campur dengan data pada "[Data Pengguna]" untuk menjawab pertanyaan jenis ini.
 
 KONTEKS DATABASE:
 {context}

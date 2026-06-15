@@ -54,7 +54,7 @@ function ChatPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const sessionFromUrl = searchParams.get("session");
-  const { userRole } = useUser();
+  const { userRole, nimNip, userName, prodi, kelas, kodeDosen } = useUser();
 
   const [messages, setMessages] = useState<Message[]>([WELCOME_MESSAGE]);
   const [input, setInput] = useState("");
@@ -230,6 +230,11 @@ function ChatPageContent() {
           query: userContent,
           user_mode: userRole || "Mahasiswa",
           history: chatHistoryContext,
+          nama: userName || null,
+          nim_nip: nimNip || null,
+          prodi: prodi || null,
+          kelas: kelas || null,
+          kode_dosen: kodeDosen || null,
         }),
       });
 
