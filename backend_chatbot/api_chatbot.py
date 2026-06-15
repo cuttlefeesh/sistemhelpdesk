@@ -28,10 +28,8 @@ limiter = Limiter(key_func=get_remote_address)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-# Batas jumlah request chat yang diproses bersamaan (panggilan sync & blocking ke Ollama/DB/model).
-# Nilai 2 dipilih sebagai eksperimen seimbang untuk VPS 1 vCPU/4GB tanpa upgrade infra.
-CHAT_CONCURRENCY_LIMIT = 2
-chat_lock = asyncio.Semaphore(CHAT_CONCURRENCY_LIMIT)
+# Hanya 1 request chat yang diproses Ollama secara bersamaan (panggilan sync & blocking)
+chat_lock = asyncio.Lock()
 
 # Mengizinkan Next.js (frontend) untuk memanggil API ini
 # CORS_ORIGINS: comma-separated list URL produksi, e.g. "https://app.vercel.app,https://admin.vercel.app"
@@ -249,16 +247,11 @@ async def _generate_chat_response(req: ChatRequest):
     )
     search_query = f"{user_msgs[-1]} {safe_prompt}" if is_follow_up and user_msgs else safe_prompt
     
+    intent = get_intent(safe_prompt)
     clean_query = preprocess_text(search_query)
     if not clean_query.strip():
         clean_query = search_query.strip()
-
-    # intent (torch, CPU-bound) dan query_embed (HTTP ke Ollama, sync) tidak saling
-    # bergantung -> jalankan bersamaan di thread terpisah agar event loop tidak terblokir.
-    intent, query_embed = await asyncio.gather(
-        asyncio.to_thread(get_intent, safe_prompt),
-        asyncio.to_thread(get_embedding, clean_query),
-    )
+    query_embed = get_embedding(clean_query)
     
     # 3. Filter DB berdasarkan role user
     is_prosedur = any(k in current_lower for k in ["prosedur", "surat", "bagaimana", "pengajuan", "cuti", "cara", "syarat", "mekanisme", "melihat", "waktu", "dimana", "print", "membuat", "mengajukan", "mengambil", "melakukan", "cetak", "layanan", "terbit", "daftar", "mendaftar", "meminjam", "toss"])
@@ -277,20 +270,14 @@ async def _generate_chat_response(req: ChatRequest):
         sql_kb_filter = " AND LOWER(tipe_pengguna) IN ('mahasiswa', 'dosen')"
 
     if intent == "prosedur" or (is_prosedur and not is_user_query):
-        context = await asyncio.to_thread(
-            fetch_dynamic_context, clean_query, query_embed, "knowledge_base", top_k=4, extra_filter=sql_kb_filter
-        )
+        context = fetch_dynamic_context(clean_query, query_embed, "knowledge_base", top_k=4, extra_filter=sql_kb_filter)
     elif intent == "dosen" or (is_user_query and not is_prosedur):
-        ctx_users, ctx_kb = await asyncio.gather(
-            asyncio.to_thread(fetch_dynamic_context, clean_query, query_embed, "users", top_k=3, extra_filter=sql_users_filter),
-            asyncio.to_thread(fetch_dynamic_context, clean_query, query_embed, "knowledge_base", top_k=2, extra_filter=sql_kb_filter),
-        )
+        ctx_users = fetch_dynamic_context(clean_query, query_embed, "users", top_k=3, extra_filter=sql_users_filter)
+        ctx_kb = fetch_dynamic_context(clean_query, query_embed, "knowledge_base", top_k=2, extra_filter=sql_kb_filter)
         context = f"[Data Pengguna]:\n{ctx_users}\n\n[Knowledge Base]:\n{ctx_kb}"
     else:
-        ctx_users, ctx_kb = await asyncio.gather(
-            asyncio.to_thread(fetch_dynamic_context, clean_query, query_embed, "users", top_k=2, extra_filter=sql_users_filter),
-            asyncio.to_thread(fetch_dynamic_context, clean_query, query_embed, "knowledge_base", top_k=4, extra_filter=sql_kb_filter),
-        )
+        ctx_users = fetch_dynamic_context(clean_query, query_embed, "users", top_k=2, extra_filter=sql_users_filter)
+        ctx_kb = fetch_dynamic_context(clean_query, query_embed, "knowledge_base", top_k=4, extra_filter=sql_kb_filter)
         context = f"[Data Pengguna]:\n{ctx_users}\n\n[Knowledge Base]:\n{ctx_kb}"
 
     # 4. Susun System Prompt
@@ -358,17 +345,8 @@ KONTEKS DATABASE:
     messages.append({"role": "user", "content": secure_user_input})
     
     try:
-        # Panggil ollama tanpa stream agar mudah diterima frontend.
-        # Dijalankan di thread terpisah (ollama_client.chat bersifat blocking/sync) agar
-        # event loop tidak terhenti dan permintaan lain tetap bisa dicek terhadap
-        # CHAT_CONCURRENCY_LIMIT (chat_lock.locked()/acquire) tanpa menunggu.
-        response = await asyncio.to_thread(
-            ollama_client.chat,
-            model=LLM_MODEL,
-            messages=messages,
-            stream=False,
-            options={"num_ctx": 2048},
-        )
+        # Panggil ollama tanpa stream agar mudah diterima frontend
+        response = ollama_client.chat(model=LLM_MODEL, messages=messages, stream=False, options={"num_ctx": 2048})
         response_text = response['message']['content']
 
         ESCALATION_MARKER = "[ESKALASI]"
