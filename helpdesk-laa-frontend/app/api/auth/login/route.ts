@@ -19,8 +19,8 @@ export async function POST(request: Request) {
 
   if (!loginLimiter.check(String(nimNip).trim())) {
     return NextResponse.json(
-      { status: "error", message: "Terlalu banyak percobaan login untuk akun ini. Coba lagi dalam 1 jam." },
-      { status: 429, headers: { "Retry-After": "3600" } },
+      { status: "error", message: "Terlalu banyak percobaan login untuk akun ini. Coba lagi dalam 15 menit." },
+      { status: 429, headers: { "Retry-After": "900" } },
     );
   }
 
