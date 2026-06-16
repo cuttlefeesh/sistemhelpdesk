@@ -4,8 +4,8 @@ import bcrypt from "bcryptjs";
 import { signToken, cookieName, cookieOptions } from "@/lib/auth";
 import { rateLimit } from "@/lib/rateLimit";
 
-// Per-akun (NIM/NIP): 5x / 15 menit — mencegah brute-force satu akun
-const loginLimiter = rateLimit({ interval: 15 * 60_000, limit: 5 });
+// Per-akun (NIM/NIP): 10x / 15 menit — mencegah brute-force satu akun
+const loginLimiter = rateLimit({ interval: 15 * 60_000, limit: 10 });
 
 export async function POST(request: Request) {
   const { nimNip, password } = await request.json();
@@ -19,8 +19,8 @@ export async function POST(request: Request) {
 
   if (!loginLimiter.check(String(nimNip).trim())) {
     return NextResponse.json(
-      { status: "error", message: "Terlalu banyak percobaan login untuk akun ini. Coba lagi dalam 15 menit." },
-      { status: 429, headers: { "Retry-After": "900" } },
+      { status: "error", message: "Terlalu banyak percobaan login untuk akun ini. Coba lagi dalam 1 jam." },
+      { status: 429, headers: { "Retry-After": "3600" } },
     );
   }
 

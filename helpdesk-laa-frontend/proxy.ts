@@ -3,7 +3,7 @@ import { verifyToken, cookieName } from "@/lib/auth";
 import { rateLimit } from "@/lib/rateLimit";
 
 // Login & reset password: backstop per-IP. Cek per-akun (lebih ketat) dilakukan di route handler.
-const loginLimiterIP = rateLimit({ interval: 15 * 60_000, limit: 120 });
+const loginLimiterIP = rateLimit({ interval: 60 * 60_000, limit: 120 });
 const resetLimiterIP = rateLimit({ interval: 60 * 60_000, limit: 50 });
 // Guest chat: backstop per-IP. Cek per-guest-id (lebih ketat) dilakukan di route handler.
 const guestChatLimiterIP = rateLimit({ interval: 60 * 60_000, limit: 250 });
