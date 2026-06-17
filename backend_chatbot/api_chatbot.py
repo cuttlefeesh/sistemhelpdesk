@@ -6,7 +6,6 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from pydantic import BaseModel
 import psycopg2
@@ -24,12 +23,24 @@ load_dotenv()
 # Inisialisasi FastAPI
 app = FastAPI()
 
-limiter = Limiter(key_func=get_remote_address)
+# Baca X-Forwarded-For agar setiap VU load test (dengan IP berbeda di header)
+# diperlakukan sebagai user terpisah oleh rate limiter. Pada traffic produksi
+# yang melewati Vercel/proxy, header ini diisi otomatis oleh proxy.
+def get_client_ip(request: Request) -> str:
+    forwarded = request.headers.get("X-Forwarded-For")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.client.host if request.client else "127.0.0.1"
+
+limiter = Limiter(key_func=get_client_ip)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-# Hanya 1 request chat yang diproses Ollama secara bersamaan (panggilan sync & blocking)
-chat_lock = asyncio.Lock()
+# Maks 2 request chat diproses bersamaan di pipeline FastAPI (preprocessing paralel).
+# Ollama Cloud free = 1 concurrent inference → request ke-2 selesai preprocessing
+# lebih dulu sambil menunggu giliran di Ollama, bukan antri dari awal.
+CHAT_CONCURRENCY_LIMIT = 2
+chat_lock = asyncio.Semaphore(CHAT_CONCURRENCY_LIMIT)
 
 # Mengizinkan Next.js (frontend) untuk memanggil API ini
 # CORS_ORIGINS: comma-separated list URL produksi, e.g. "https://app.vercel.app,https://admin.vercel.app"
@@ -238,7 +249,7 @@ class ChatRequest(BaseModel):
 
 # --- ENDPOINT UTAMA CHATBOT ---
 @app.post("/api/chat-bot")
-@limiter.limit("30/minute")
+@limiter.limit("10/minute")
 async def process_chat(req: ChatRequest, request: Request):
     if chat_lock.locked():
         raise HTTPException(
