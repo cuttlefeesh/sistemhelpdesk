@@ -212,6 +212,7 @@ ExecStart=/usr/local/bin/ollama serve
 Restart=always
 RestartSec=3
 Environment="OLLAMA_HOST=127.0.0.1:11434"
+Environment="HOME=/root"
 
 [Install]
 WantedBy=multi-user.target
