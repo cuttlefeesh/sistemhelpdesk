@@ -3,13 +3,34 @@
 # setup-vps.sh — Script setup VPS Hostinger Malaysia untuk backend_chatbot
 # OS Target: Ubuntu 22.04 LTS
 # Jalankan sebagai root: bash setup-vps.sh
+#
+# PENTING — JANGAN edit nilai DOMAIN/DB_PASS/REPO_URL di bawah ini langsung
+# di file ini. File ini tertrack git; kalau diisi nilai asli lalu di-commit,
+# secret akan tersimpan permanen di git history.
+#
+# Cara aman mengisi nilai asli, pilih salah satu:
+#   1) Override via environment variable saat run, contoh:
+#        DOMAIN=api.contoh.com DB_PASS='passwordKuat123!' bash setup-vps.sh
+#   2) Buat file deployment/.env.deploy (sudah di-gitignore via pola .env*),
+#      isi seperti contoh di deployment/.env.deploy.example, lalu jalankan
+#      seperti biasa — script otomatis source file itu kalau ada.
 # =============================================================================
 set -e
 
-DOMAIN="api.DOMAIN-ANDA.com"   # <-- GANTI dengan domain Anda sebelum run
-DB_NAME="helpdesk_db"
-DB_PASS="GANTI_PASSWORD_KUAT"  # <-- GANTI dengan password kuat (min 20 karakter)
-DEPLOY_DIR="/opt/helpdesk-backend"
+cd "$(dirname "$0")"
+if [ -f ".env.deploy" ]; then
+  echo "Memuat variabel dari deployment/.env.deploy (tidak tertrack git)"
+  set -a
+  source ".env.deploy"
+  set +a
+fi
+
+DOMAIN="${DOMAIN:-api.DOMAIN-ANDA.com}"   # <-- override via env var atau .env.deploy
+DB_NAME="${DB_NAME:-helpdesk_db}"
+DB_PASS="${DB_PASS:-GANTI_PASSWORD_KUAT}"  # <-- override via env var atau .env.deploy (min 20 karakter)
+REPO_URL="${REPO_URL:-git@github.com:cuttlefeesh/sistemhelpdesk.git}"  # <-- override jika perlu
+REPO_DIR="/opt/helpdesk-backend"   # hasil git clone (root repo)
+DEPLOY_DIR="$REPO_DIR/backend_chatbot"  # lokasi kode aplikasi (subfolder repo)
 
 echo "================================================================="
 echo " Helpdesk LAA — VPS Setup Script"
@@ -20,10 +41,10 @@ echo "================================================================="
 echo ""
 
 # =============================================================================
-echo "=== [1/10] Update sistem & install dependensi ==="
+echo "=== [1/11] Update sistem & install dependensi ==="
 # =============================================================================
 apt update && apt upgrade -y
-apt install -y git curl wget nginx \
+apt install -y git git-lfs curl wget nginx \
   python3.12 python3.12-venv python3-pip build-essential \
   postgresql postgresql-contrib \
   postgresql-16-pgvector \
@@ -35,7 +56,7 @@ ln -sf /snap/bin/certbot /usr/bin/certbot
 apt install -y python3-certbot-nginx
 
 # =============================================================================
-echo "=== [2/10] Verifikasi pgvector (sudah diinstall via apt) ==="
+echo "=== [2/11] Verifikasi pgvector (sudah diinstall via apt) ==="
 # =============================================================================
 # Di Ubuntu 24.04, postgresql-16-pgvector diinstall via apt pada step sebelumnya
 # Verifikasi extension tersedia:
@@ -43,7 +64,7 @@ sudo -u postgres psql -c "SELECT * FROM pg_available_extensions WHERE name='vect
 echo "pgvector tersedia via apt (postgresql-16-pgvector)"
 
 # =============================================================================
-echo "=== [3/10] Setup PostgreSQL + database ==="
+echo "=== [3/11] Setup PostgreSQL + database ==="
 # =============================================================================
 sudo -u postgres psql << SQL
 CREATE DATABASE IF NOT EXISTS $DB_NAME;
@@ -76,7 +97,7 @@ systemctl restart postgresql
 echo "PostgreSQL SSL: $(sudo -u postgres psql -c 'SHOW ssl;' -t | tr -d ' ')"
 
 # =============================================================================
-echo "=== [4/10] Setup fail2ban untuk proteksi brute force ==="
+echo "=== [4/11] Setup fail2ban untuk proteksi brute force ==="
 # =============================================================================
 cat > /etc/fail2ban/filter.d/postgresql.conf << 'EOF'
 [Definition]
@@ -100,34 +121,52 @@ systemctl restart fail2ban
 echo "fail2ban aktif: $(fail2ban-client status postgresql 2>/dev/null | grep 'Currently banned' || echo 'OK')"
 
 # =============================================================================
-echo "=== [5/10] Buat user chatbot & direktori deploy ==="
+echo "=== [5/11] Buat user chatbot & direktori deploy ==="
 # =============================================================================
 if ! id "chatbot" &>/dev/null; then
   adduser --disabled-password --gecos "" chatbot
 fi
-mkdir -p "$DEPLOY_DIR"
-chown chatbot:chatbot "$DEPLOY_DIR"
+mkdir -p "$REPO_DIR"
+chown chatbot:chatbot "$REPO_DIR"
 
 # =============================================================================
-echo "=== [6/10] Upload file backend ==="
+echo "=== [6/11] Clone repo via git (deploy key, read-only) ==="
 # =============================================================================
+# Generate SSH key khusus user "chatbot" untuk akses clone/pull dari GitHub.
+# Key ini HANYA dipakai VPS -> GitHub (read-only), berbeda dari key yang dipakai
+# GitHub Actions untuk SSH masuk ke VPS (lihat langkah di bawah).
+sudo -u chatbot mkdir -p /home/chatbot/.ssh
+if [ ! -f /home/chatbot/.ssh/id_ed25519 ]; then
+  sudo -u chatbot ssh-keygen -t ed25519 -C "vps-deploy-key" -f /home/chatbot/.ssh/id_ed25519 -N ""
+fi
+ssh-keyscan -t ed25519 github.com >> /home/chatbot/.ssh/known_hosts 2>/dev/null
+chown -R chatbot:chatbot /home/chatbot/.ssh
+
 echo ""
-echo ">>> Jalankan perintah ini dari MESIN LOKAL (PowerShell/terminal):"
-echo "    scp -r sistemhelpdesk/backend_chatbot/* root@$(curl -s https://api.ipify.org):$DEPLOY_DIR/"
-echo ""
-read -rp "Tekan Enter setelah upload selesai..."
+echo ">>> Tambahkan PUBLIC KEY berikut sebagai Deploy Key (read-only) di:"
+echo "    GitHub repo > Settings > Deploy keys > Add deploy key"
+echo "-----------------------------------------------------------------"
+cat /home/chatbot/.ssh/id_ed25519.pub
+echo "-----------------------------------------------------------------"
+read -rp "Tekan Enter setelah deploy key ditambahkan di GitHub..."
+
+# Clone hanya backend_chatbot/ + deployment/ (sparse-checkout) agar tidak
+# menarik source code frontend/admin yang tidak dipakai di VPS ini.
+sudo -u chatbot git clone --filter=blob:none --no-checkout "$REPO_URL" "$REPO_DIR"
+cd "$REPO_DIR"
+sudo -u chatbot git sparse-checkout init --cone
+sudo -u chatbot git sparse-checkout set backend_chatbot deployment
+sudo -u chatbot git checkout main
+sudo -u chatbot git lfs pull
 
 # =============================================================================
-echo "=== [7/10] Setup Python virtualenv & install dependensi ==="
+echo "=== [7/11] Setup Python virtualenv & install dependensi ==="
 # =============================================================================
 cd "$DEPLOY_DIR"
-python3.12 -m venv venv
-source venv/bin/activate
-pip install --upgrade pip
-pip install fastapi uvicorn python-dotenv psycopg2-binary ollama \
-  pydantic slowapi torch transformers PySastrawi
+sudo -u chatbot python3.12 -m venv venv
+sudo -u chatbot bash -c "source venv/bin/activate && pip install --upgrade pip && pip install -r requirements.txt"
 
-# Buat file .env produksi
+# Buat file .env produksi (TIDAK ikut di-track git — lihat backend_chatbot/.gitignore)
 cat > "$DEPLOY_DIR/.env" << ENV_EOF
 DB_HOST=localhost
 DB_NAME=$DB_NAME
@@ -137,11 +176,23 @@ DB_PORT=5432
 CORS_ORIGINS=https://GANTI-FRONTEND.vercel.app,https://GANTI-ADMIN.vercel.app
 FRONTEND_URL=https://GANTI-FRONTEND.vercel.app
 ENV_EOF
+chown chatbot:chatbot "$DEPLOY_DIR/.env"
 chmod 600 "$DEPLOY_DIR/.env"
 echo ".env dibuat di $DEPLOY_DIR/.env — update CORS_ORIGINS setelah deploy Vercel"
 
 # =============================================================================
-echo "=== [8/10] Install Ollama ==="
+echo "=== [7b/11] Sudoers untuk auto-deploy via GitHub Actions ==="
+# =============================================================================
+# Mengizinkan user "chatbot" merestart/melihat status service ini TANPA password,
+# dipakai oleh deployment/deploy-backend.sh saat dipanggil dari GitHub Actions.
+cat > /etc/sudoers.d/chatbot-deploy << 'EOF'
+chatbot ALL=(root) NOPASSWD: /usr/bin/systemctl restart helpdesk-api, /usr/bin/systemctl status helpdesk-api
+EOF
+chmod 440 /etc/sudoers.d/chatbot-deploy
+visudo -c -f /etc/sudoers.d/chatbot-deploy
+
+# =============================================================================
+echo "=== [8/11] Install Ollama ==="
 # =============================================================================
 if ! command -v ollama &>/dev/null; then
   curl -fsSL https://ollama.com/install.sh | sh
@@ -175,7 +226,7 @@ echo "Model Ollama:"
 ollama list
 
 # =============================================================================
-echo "=== [9/10] Setup systemd service FastAPI ==="
+echo "=== [9/11] Setup systemd service FastAPI ==="
 # =============================================================================
 cat > /etc/systemd/system/helpdesk-api.service << EOF
 [Unit]
@@ -202,7 +253,7 @@ systemctl enable helpdesk-api
 systemctl start helpdesk-api
 
 # =============================================================================
-echo "=== [10/10] Konfigurasi Nginx + Firewall + SSL ==="
+echo "=== [10/11] Konfigurasi Nginx + Firewall + SSL ==="
 # =============================================================================
 cat > /etc/nginx/sites-available/helpdesk-api << NGINX_EOF
 server {
@@ -256,6 +307,30 @@ certbot --nginx -d "$DOMAIN" --non-interactive --agree-tos \
 systemctl reload nginx
 
 # =============================================================================
+echo "=== [11/11] Access key untuk auto-deploy via GitHub Actions ==="
+# =============================================================================
+# Key terpisah ini dipakai GitHub Actions untuk SSH MASUK ke VPS (arah
+# kebalikan dari deploy key di langkah [6/11] yang dipakai VPS untuk
+# git pull dari GitHub). Private key-nya disimpan sebagai GitHub Secret,
+# TIDAK pernah disimpan di VPS.
+mkdir -p /home/chatbot/.ssh
+echo ""
+echo ">>> Generate keypair INI DI MESIN LOKAL (bukan di VPS), contoh:"
+echo "    ssh-keygen -t ed25519 -C \"github-actions-deploy\" -f gh_actions_deploy -N \"\""
+echo ""
+echo ">>> Tempel ISI PUBLIC KEY (gh_actions_deploy.pub) di bawah, lalu Enter, lalu Ctrl+D:"
+cat >> /home/chatbot/.ssh/authorized_keys
+chown -R chatbot:chatbot /home/chatbot/.ssh
+chmod 700 /home/chatbot/.ssh
+chmod 600 /home/chatbot/.ssh/authorized_keys
+echo ""
+echo ">>> Simpan PRIVATE KEY (gh_actions_deploy, isi file lengkap) sebagai GitHub"
+echo "    Secret berikut di repo > Settings > Secrets and variables > Actions:"
+echo "      VPS_SSH_KEY  = isi file gh_actions_deploy (private key)"
+echo "      VPS_HOST     = $(curl -s https://api.ipify.org)"
+echo "      VPS_USER     = chatbot"
+
+# =============================================================================
 echo ""
 echo "================================================================="
 echo " SETUP SELESAI"
@@ -273,4 +348,6 @@ echo " LANGKAH SELANJUTNYA:"
 echo " 1. Migrasi database via pgAdmin 4 (lihat plan deployment)"
 echo " 2. Update CORS_ORIGINS di $DEPLOY_DIR/.env dengan URL Vercel"
 echo " 3. Deploy frontend ke Vercel dan set environment variables"
+echo " 4. Set GitHub Secrets VPS_HOST, VPS_USER, VPS_SSH_KEY (lihat langkah 11)"
+echo "    agar push ke backend_chatbot/** otomatis deploy via GitHub Actions"
 echo "================================================================="

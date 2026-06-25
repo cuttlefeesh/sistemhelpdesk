@@ -4,3 +4,6 @@ backend_chatbot/model/
 **/__pycache__/
 *.pyc
 .env*
+
+# File contoh/template .env — tidak berisi secret asli, aman & perlu di-commit
+!**/.env*.example
