@@ -144,22 +144,33 @@ fi
 ssh-keyscan -t ed25519 github.com >> /home/chatbot/.ssh/known_hosts 2>/dev/null
 chown -R chatbot:chatbot /home/chatbot/.ssh
 
-echo ""
-echo ">>> Tambahkan PUBLIC KEY berikut sebagai Deploy Key (read-only) di:"
-echo "    GitHub repo > Settings > Deploy keys > Add deploy key"
-echo "-----------------------------------------------------------------"
-cat /home/chatbot/.ssh/id_ed25519.pub
-echo "-----------------------------------------------------------------"
-read -rp "Tekan Enter setelah deploy key ditambahkan di GitHub..."
+# Idempotent: kalau repo sudah pernah di-clone (misal script di-run ulang
+# setelah gagal di step lain), skip clone & cukup pull update terbaru —
+# "git clone" akan error "destination path already exists" kalau dipaksa ulang.
+if [ -d "$REPO_DIR/.git" ]; then
+  echo "Repo sudah ada di $REPO_DIR, skip clone — jalankan git pull saja."
+  cd "$REPO_DIR"
+  sudo -u chatbot git fetch origin main
+  sudo -u chatbot git reset --hard origin/main
+  sudo -u chatbot git lfs pull
+else
+  echo ""
+  echo ">>> Tambahkan PUBLIC KEY berikut sebagai Deploy Key (read-only) di:"
+  echo "    GitHub repo > Settings > Deploy keys > Add deploy key"
+  echo "-----------------------------------------------------------------"
+  cat /home/chatbot/.ssh/id_ed25519.pub
+  echo "-----------------------------------------------------------------"
+  read -rp "Tekan Enter setelah deploy key ditambahkan di GitHub..."
 
-# Clone hanya backend_chatbot/ + deployment/ (sparse-checkout) agar tidak
-# menarik source code frontend/admin yang tidak dipakai di VPS ini.
-sudo -u chatbot git clone --filter=blob:none --no-checkout "$REPO_URL" "$REPO_DIR"
-cd "$REPO_DIR"
-sudo -u chatbot git sparse-checkout init --cone
-sudo -u chatbot git sparse-checkout set backend_chatbot deployment
-sudo -u chatbot git checkout main
-sudo -u chatbot git lfs pull
+  # Clone hanya backend_chatbot/ + deployment/ (sparse-checkout) agar tidak
+  # menarik source code frontend/admin yang tidak dipakai di VPS ini.
+  sudo -u chatbot git clone --filter=blob:none --no-checkout "$REPO_URL" "$REPO_DIR"
+  cd "$REPO_DIR"
+  sudo -u chatbot git sparse-checkout init --cone
+  sudo -u chatbot git sparse-checkout set backend_chatbot deployment
+  sudo -u chatbot git checkout main
+  sudo -u chatbot git lfs pull
+fi
 
 # =============================================================================
 echo "=== [7/11] Setup Python virtualenv & install dependensi ==="
@@ -170,7 +181,7 @@ sudo -u chatbot bash -c "source venv/bin/activate && pip install --upgrade pip &
 
 # Buat file .env produksi (TIDAK ikut di-track git — lihat backend_chatbot/.gitignore)
 cat > "$DEPLOY_DIR/.env" << ENV_EOF
-DB_HOST=localhost
+DB_HOST=127.0.0.1
 DB_NAME=$DB_NAME
 DB_USER=postgres
 DB_PASS=$DB_PASS
@@ -227,6 +238,27 @@ ollama pull nomic-embed-text
 ollama pull gemma3:27b-cloud
 echo "Model Ollama:"
 ollama list
+
+# Verifikasi instalasi Ollama benar-benar bisa generate embedding. Instalasi
+# via install.sh kadang korup/tidak lengkap (binary "llama-server" hilang),
+# baru kelihatan saat chatbot dipakai kalau tidak dicek di sini.
+echo ">>> Verifikasi embedding Ollama..."
+EMBED_TEST=$(curl -s http://127.0.0.1:11434/api/embeddings -d '{"model":"nomic-embed-text","prompt":"test"}')
+if echo "$EMBED_TEST" | grep -q '"embedding"'; then
+  echo "Ollama embedding OK."
+else
+  echo "Ollama embedding GAGAL ($EMBED_TEST) — mencoba reinstall Ollama..."
+  curl -fsSL https://ollama.com/install.sh | sh
+  systemctl restart ollama
+  sleep 3
+  ollama pull nomic-embed-text
+  EMBED_TEST=$(curl -s http://127.0.0.1:11434/api/embeddings -d '{"model":"nomic-embed-text","prompt":"test"}')
+  if echo "$EMBED_TEST" | grep -q '"embedding"'; then
+    echo "Ollama embedding OK setelah reinstall."
+  else
+    echo "Ollama embedding MASIH GAGAL — cek manual: journalctl -u ollama -n 50 --no-pager"
+  fi
+fi
 
 # =============================================================================
 echo "=== [9/11] Setup systemd service FastAPI ==="
@@ -307,7 +339,18 @@ certbot --nginx -d "$DOMAIN" --non-interactive --agree-tos \
   -m "admin@$(echo $DOMAIN | cut -d'.' -f2-)" || \
   echo "SSL gagal — pastikan DNS sudah propagasi lalu jalankan: certbot --nginx -d $DOMAIN"
 
-systemctl reload nginx
+# HSTS — baru bisa ditambahkan SETELAH certbot membuat blok "listen 443 ssl"
+# (tidak bisa ditulis di heredoc atas karena saat itu cert/blok SSL belum ada).
+# Vercel (frontend/admin) sudah otomatis kirim header ini sendiri; backend di
+# VPS ini perlu di-set manual karena tidak lewat Vercel.
+if grep -q "listen 443 ssl" /etc/nginx/sites-available/helpdesk-api 2>/dev/null && \
+   ! grep -q "Strict-Transport-Security" /etc/nginx/sites-available/helpdesk-api; then
+  sed -i '/listen 443 ssl;/a\    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains" always;' \
+    /etc/nginx/sites-available/helpdesk-api
+  echo "HSTS header ditambahkan ke konfigurasi Nginx."
+fi
+
+nginx -t && systemctl reload nginx
 
 # =============================================================================
 echo "=== [11/11] Access key untuk auto-deploy via GitHub Actions ==="
@@ -350,7 +393,12 @@ echo ""
 echo " LANGKAH SELANJUTNYA:"
 echo " 1. Migrasi database via pgAdmin 4 (lihat plan deployment)"
 echo " 2. Update CORS_ORIGINS di $DEPLOY_DIR/.env dengan URL Vercel"
-echo " 3. Deploy frontend ke Vercel dan set environment variables"
+echo " 3. Deploy frontend ke Vercel dan set environment variables. PENTING:"
+echo "    DATABASE_URL WAJIB pakai ?sslmode=require&uselibpqcompat=true"
+echo "    (PostgreSQL pakai cert self-signed — tanpa parameter ini, driver pg"
+echo "    Node.js modern akan reject dengan error 'self-signed certificate')"
 echo " 4. Set GitHub Secrets VPS_HOST, VPS_USER, VPS_SSH_KEY (lihat langkah 11)"
 echo "    agar push ke backend_chatbot/** otomatis deploy via GitHub Actions"
+echo " 5. ollama login bisa expired/hilang kalau Ollama di-reinstall manual —"
+echo "    kalau chatbot tiba-tiba 401 dari LLM, jalankan 'ollama login' ulang"
 echo "================================================================="
