@@ -36,18 +36,37 @@ Ganti semua placeholder `<...>` dengan nilai sebenarnya sebelum dieksekusi.
 
 ## 3. Jalankan `setup-vps.sh`
 
-- [ ] Edit variabel di bagian atas [setup-vps.sh](setup-vps.sh) sebelum run:
+- [ ] **Di komputer lokal (laptop)**, siapkan `deployment/.env.deploy` —
+      JANGAN edit nilai langsung di `setup-vps.sh` (file itu tertrack git,
+      bisa bocor ke git history kalau ter-commit):
   ```bash
-  DOMAIN="api.<DOMAIN_BARU>.com"
-  DB_PASS="<password_kuat_min_20_karakter>"
-  REPO_URL="git@github.com:<akun-atau-org>/sistemhelpdesk.git"
+  cd sistemhelpdesk/deployment
+  cp .env.deploy.example .env.deploy
   ```
-- [ ] Upload & jalankan sebagai root di VPS baru:
+  Isi `deployment/.env.deploy` dengan nilai asli (file ini tidak ter-commit,
+  sudah di-gitignore). **Ganti semua `<...>` dengan nilai sebenarnya** — tanda
+  `<` `>` cuma penanda placeholder, jangan diketik literal:
   ```bash
-  scp deployment/setup-vps.sh root@<IP_VPS_BARU>:/root/
-  ssh root@<IP_VPS_BARU>
+  DOMAIN=api.domainasliAnda.com
+  DB_PASS=passwordKuatAsli123!
+  REPO_URL=git@github.com:<akun-atau-org>/sistemhelpdesk.git
+  ```
+- [ ] **Masih di laptop** — upload kedua file (jalankan dari dalam folder
+      `deployment/`, jangan tulis dobel `deployment/deployment/`), lalu SSH
+      masuk ke VPS:
+  ```bash
+  scp setup-vps.sh .env.deploy root@<IP_VPS_ASLI>:/root/
+  ssh root@<IP_VPS_ASLI>
+  ```
+- [ ] **Setelah prompt berubah jadi `root@<hostname>:~#`** — ini tandanya Anda
+      SUDAH MASUK ke VPS, bukan lagi di laptop. Baru di titik ini jalankan:
+  ```bash
   bash setup-vps.sh
   ```
+  Script otomatis mendeteksi & membaca `.env.deploy` (muncul baris "Memuat
+  variabel dari deployment/.env.deploy..." di output).
+- [ ] Setelah setup selesai, **hapus `.env.deploy` dari VPS** (sudah tidak
+      perlu, isinya password plaintext): `rm /root/.env.deploy`
 - [ ] Saat script **berhenti minta input** (2 kali):
   1. **Deploy key** — copy public key yang ditampilkan, tambahkan di
      GitHub repo → **Settings → Deploy keys → Add deploy key** (read-only, tanpa

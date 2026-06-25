@@ -66,8 +66,10 @@ echo "pgvector tersedia via apt (postgresql-16-pgvector)"
 # =============================================================================
 echo "=== [3/11] Setup PostgreSQL + database ==="
 # =============================================================================
+# PostgreSQL tidak punya syntax "CREATE DATABASE IF NOT EXISTS" (itu MySQL),
+# jadi cek dulu via pg_database pakai \gexec agar idempotent (aman di-run ulang).
 sudo -u postgres psql << SQL
-CREATE DATABASE IF NOT EXISTS $DB_NAME;
+SELECT 'CREATE DATABASE $DB_NAME' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = '$DB_NAME')\gexec
 \c $DB_NAME
 CREATE EXTENSION IF NOT EXISTS vector;
 ALTER USER postgres WITH PASSWORD '$DB_PASS';

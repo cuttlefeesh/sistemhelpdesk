@@ -33,15 +33,27 @@ dependensi, setup PostgreSQL + pgvector, konfigurasi koneksi eksternal, setup
 fail2ban. Langkah-langkah ini sudah terotomasi di [setup-vps.sh](setup-vps.sh)
 step **[1/11] s/d [4/11]**.
 
-- [ ] `ssh root@<IP_VPS_BARU>`
-- [ ] Edit variabel di atas [setup-vps.sh](setup-vps.sh):
+- [ ] **Di komputer lokal (laptop)**, siapkan `deployment/.env.deploy` —
+      JANGAN edit nilai langsung di [setup-vps.sh](setup-vps.sh) (file itu
+      tertrack git, bisa bocor ke git history kalau ter-commit):
   ```bash
-  DOMAIN="api.<DOMAIN_BARU>.com"
-  DB_PASS="<password_kuat_min_20_karakter>"
-  REPO_URL="git@github.com:<akun-atau-org>/sistemhelpdesk.git"
+  cd sistemhelpdesk/deployment
+  cp .env.deploy.example .env.deploy
+  # isi DOMAIN, DB_PASS, REPO_URL dengan nilai asli (ganti SEMUA <...> —
+  # tanda <> cuma placeholder, jangan diketik literal). File ini tidak ter-commit.
   ```
-- [ ] Upload & jalankan: `scp deployment/setup-vps.sh root@<IP_VPS_BARU>:/root/`
-      lalu `bash setup-vps.sh` (script akan berhenti di langkah 4.5 untuk minta input)
+- [ ] **Masih di laptop** — upload kedua file lalu SSH masuk ke VPS (jalankan
+      dari dalam folder `deployment/`, jangan tulis dobel `deployment/deployment/`):
+  ```bash
+  scp setup-vps.sh .env.deploy root@<IP_VPS_ASLI>:/root/
+  ssh root@<IP_VPS_ASLI>
+  ```
+- [ ] **Setelah prompt berubah jadi `root@<hostname>:~#`** (artinya sudah
+      masuk ke VPS, bukan lagi di laptop) — baru jalankan:
+  ```bash
+  bash setup-vps.sh   # otomatis baca .env.deploy; berhenti di langkah 4.5 untuk minta input
+  ```
+- [ ] Setelah setup selesai, hapus dari VPS: `rm /root/.env.deploy`
 
 ## 4.4 Migrasi Database dari Sumber ke VPS
 
