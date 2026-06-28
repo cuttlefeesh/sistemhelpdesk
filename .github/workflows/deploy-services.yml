@@ -55,13 +55,13 @@ jobs:
   deploy-backend:
     needs: changes
     if: ${{ needs.changes.outputs.backend == 'true' }}
-    runs-on: ubuntu-latest
+    # Runner self-hosted yang jalan langsung di VPS (user "chatbot") — bukan
+    # runner GitHub di Azure. Dipakai karena Hostinger/network memblokir SSH
+    # inbound dari IP range Azure (GitHub-hosted runner), jadi pendekatan SSH
+    # appleboy/ssh-action tidak bisa diandalkan. Lihat deployment/setup-vps.sh
+    # untuk catatan; runner didaftarkan manual via Settings > Actions > Runners.
+    runs-on: [self-hosted, vps-backend]
     steps:
-      - name: SSH ke VPS & jalankan deploy-backend.sh
-        uses: appleboy/ssh-action@v1.2.0
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          script: bash /opt/helpdesk-backend/deployment/deploy-backend.sh
+      - name: Jalankan deploy-backend.sh langsung di VPS
+        run: bash /opt/helpdesk-backend/deployment/deploy-backend.sh
 
