@@ -198,8 +198,11 @@ echo "=== [7b/11] Sudoers untuk auto-deploy via GitHub Actions ==="
 # =============================================================================
 # Mengizinkan user "chatbot" merestart/melihat status service ini TANPA password,
 # dipakai oleh deployment/deploy-backend.sh saat dipanggil dari GitHub Actions.
+# Pakai wildcard "*" di akhir — sudoers mencocokkan command line PERSIS,
+# tanpa "*" maka "systemctl status helpdesk-api --no-pager -l" (dengan flag
+# tambahan) tidak akan cocok dan sudo tetap minta password.
 cat > /etc/sudoers.d/chatbot-deploy << 'EOF'
-chatbot ALL=(root) NOPASSWD: /usr/bin/systemctl restart helpdesk-api, /usr/bin/systemctl status helpdesk-api
+chatbot ALL=(root) NOPASSWD: /usr/bin/systemctl restart helpdesk-api*, /usr/bin/systemctl status helpdesk-api*
 EOF
 chmod 440 /etc/sudoers.d/chatbot-deploy
 visudo -c -f /etc/sudoers.d/chatbot-deploy
