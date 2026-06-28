@@ -356,28 +356,31 @@ fi
 nginx -t && systemctl reload nginx
 
 # =============================================================================
-echo "=== [11/11] Access key untuk auto-deploy via GitHub Actions ==="
+echo "=== [11/11] (OPSIONAL) SSH key admin untuk user chatbot ==="
 # =============================================================================
-# Key terpisah ini dipakai GitHub Actions untuk SSH MASUK ke VPS (arah
-# kebalikan dari deploy key di langkah [6/11] yang dipakai VPS untuk
-# git pull dari GitHub). Private key-nya disimpan sebagai GitHub Secret,
-# TIDAK pernah disimpan di VPS.
-mkdir -p /home/chatbot/.ssh
-echo ""
-echo ">>> Generate keypair INI DI MESIN LOKAL (bukan di VPS), contoh:"
-echo "    ssh-keygen -t ed25519 -C \"github-actions-deploy\" -f gh_actions_deploy -N \"\""
-echo ""
-echo ">>> Tempel ISI PUBLIC KEY (gh_actions_deploy.pub) di bawah, lalu Enter, lalu Ctrl+D:"
-cat >> /home/chatbot/.ssh/authorized_keys
-chown -R chatbot:chatbot /home/chatbot/.ssh
-chmod 700 /home/chatbot/.ssh
-chmod 600 /home/chatbot/.ssh/authorized_keys
-echo ""
-echo ">>> Simpan PRIVATE KEY (gh_actions_deploy, isi file lengkap) sebagai GitHub"
-echo "    Secret berikut di repo > Settings > Secrets and variables > Actions:"
-echo "      VPS_SSH_KEY  = isi file gh_actions_deploy (private key)"
-echo "      VPS_HOST     = $(curl -s https://api.ipify.org)"
-echo "      VPS_USER     = chatbot"
+# CATATAN: auto-deploy backend SEKARANG pakai self-hosted GitHub Actions
+# runner yang jalan langsung di VPS (lihat BUKU-PANDUAN-INSTALASI.md bagian
+# 4.9) — BUKAN lewat SSH dari GitHub Actions. SSH inbound dari IP datacenter
+# Azure (tempat GitHub-hosted runner jalan) terbukti di-timeout oleh jaringan
+# Hostinger, jadi pendekatan access-key di bawah ini TIDAK dipakai untuk
+# auto-deploy. Key ini opsional, cuma untuk akses SSH manual ke user chatbot
+# (misal debugging) dari mesin lokal Anda.
+read -rp "Mau setup SSH key admin opsional untuk user chatbot sekarang? (y/N) " SETUP_ADMIN_KEY
+if [[ "$SETUP_ADMIN_KEY" =~ ^[Yy]$ ]]; then
+  mkdir -p /home/chatbot/.ssh
+  echo ""
+  echo ">>> Generate keypair INI DI MESIN LOKAL (bukan di VPS), contoh:"
+  echo "    ssh-keygen -t ed25519 -C \"admin-access\" -f chatbot_admin_key -N \"\""
+  echo ""
+  echo ">>> Tempel ISI PUBLIC KEY (chatbot_admin_key.pub) di bawah, lalu Enter, lalu Ctrl+D:"
+  cat >> /home/chatbot/.ssh/authorized_keys
+  chown -R chatbot:chatbot /home/chatbot/.ssh
+  chmod 700 /home/chatbot/.ssh
+  chmod 600 /home/chatbot/.ssh/authorized_keys
+  echo "Simpan private key (chatbot_admin_key) di mesin lokal untuk: ssh -i chatbot_admin_key chatbot@$(curl -s https://api.ipify.org)"
+else
+  echo "Skip — lihat BUKU-PANDUAN-INSTALASI.md bagian 4.9 untuk setup self-hosted runner (auto-deploy)."
+fi
 
 # =============================================================================
 echo ""
@@ -400,8 +403,8 @@ echo " 3. Deploy frontend ke Vercel dan set environment variables. PENTING:"
 echo "    DATABASE_URL WAJIB pakai ?sslmode=require&uselibpqcompat=true"
 echo "    (PostgreSQL pakai cert self-signed — tanpa parameter ini, driver pg"
 echo "    Node.js modern akan reject dengan error 'self-signed certificate')"
-echo " 4. Set GitHub Secrets VPS_HOST, VPS_USER, VPS_SSH_KEY (lihat langkah 11)"
-echo "    agar push ke backend_chatbot/** otomatis deploy via GitHub Actions"
+echo " 4. Setup self-hosted GitHub Actions runner di VPS ini (user chatbot) agar"
+echo "    push ke backend_chatbot/** otomatis deploy — lihat BUKU-PANDUAN-INSTALASI.md 4.9"
 echo " 5. ollama login bisa expired/hilang kalau Ollama di-reinstall manual —"
 echo "    kalau chatbot tiba-tiba 401 dari LLM, jalankan 'ollama login' ulang"
 echo "================================================================="
